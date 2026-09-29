@@ -1,5 +1,8 @@
 const MODEL = "@cf/black-forest-labs/flux-2-klein-4b";
 
+const PRICE = 9900; // ₹99 in paise
+const CURRENCY = "INR";
+
 const styles = [
   {
     name: "Pencil Portrait",
@@ -41,7 +44,7 @@ Monochrome only, no cartoon, no simple edge filter, no distorted face.`
 function corsHeaders() {
   return {
     "Access-Control-Allow-Origin": "*",
-    "Access-Control-Allow-Methods": "POST, OPTIONS",
+    "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
     "Access-Control-Allow-Headers": "Content-Type"
   };
 }
@@ -51,6 +54,23 @@ function json(data, status = 200) {
     status,
     headers: {
       "Content-Type": "application/json",
+      ...corsHeaders()
+    }
+  });
+}
+
+function imageResponse(base64) {
+  const binary = Uint8Array.from(
+    atob(base64),
+    c => c.charCodeAt(0)
+  );
+
+  return new Response(binary, {
+    status: 200,
+    headers: {
+      "Content-Type": "image/png",
+      "Content-Disposition": "attachment; filename=\"sketch-art.png\"",
+      "Cache-Control": "no-store",
       ...corsHeaders()
     }
   });
@@ -71,21 +91,177 @@ async function generateImage(env, imageBlob, prompt) {
   form.append("guidance", "3.5");
 
   const formResponse = new Response(form);
-  const formStream = formResponse.body;
-  const formContentType = formResponse.headers.get("content-type");
 
   const result = await env.AI.run(MODEL, {
     multipart: {
-      body: formStream,
-      contentType: formContentType
+      body: formResponse.body,
+      contentType: formResponse.headers.get("content-type")
     }
   });
+
+  if (!result || !result.image) {
+    throw new Error("AI image generation failed.");
+  }
 
   return result.image;
 }
 
+function base64ToBytes(base64) {
+  const binary = atob(base64);
+
+  const bytes = new Uint8Array(binary.length);
+
+  for (let i = 0; i < binary.length; i++) {
+    bytes[i] = binary.charCodeAt(i);
+  }
+
+  return bytes;
+}
+
+function bytesToHex(bytes) {
+  return Array.from(bytes)
+    .map(b => b.toString(16).padStart(2, "0"))
+    .join("");
+}
+
+async function hmacSHA256(secret, message) {
+  const encoder = new TextEncoder();
+
+  const keyData = encoder.encode(secret);
+
+  const cryptoKey = await crypto.subtle.importKey(
+    "raw",
+    keyData,
+    {
+      name: "HMAC",
+      hash: "SHA-256"
+    },
+    false,
+    ["sign"]
+  );
+
+  const signature = await crypto.subtle.sign(
+    "HMAC",
+    cryptoKey,
+    encoder.encode(message)
+  );
+
+  return bytesToHex(new Uint8Array(signature));
+}
+
+async function createRazorpayOrder(env) {
+  if (!env.RAZORPAY_KEY_ID || !env.RAZORPAY_KEY_SECRET) {
+    throw new Error("Razorpay credentials are not configured.");
+  }
+
+  const auth = btoa(
+    `${env.RAZORPAY_KEY_ID}:${env.RAZORPAY_KEY_SECRET}`
+  );
+
+  const receipt =
+    "sketch_" +
+    Date.now() +
+    "_" +
+    crypto.randomUUID().replaceAll("-", "").slice(0, 10);
+
+  const response = await fetch(
+    "https://api.razorpay.com/v1/orders",
+    {
+      method: "POST",
+      headers: {
+        "Authorization": `Basic ${auth}`,
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        amount: PRICE,
+        currency: CURRENCY,
+        receipt: receipt
+      })
+    }
+  );
+
+  const data = await response.json();
+
+  if (!response.ok) {
+    throw new Error(
+      data?.error?.description ||
+      "Unable to create Razorpay order."
+    );
+  }
+
+  return data;
+}
+
+async function getRazorpayPayment(env, paymentId) {
+  const auth = btoa(
+    `${env.RAZORPAY_KEY_ID}:${env.RAZORPAY_KEY_SECRET}`
+  );
+
+  const response = await fetch(
+    `https://api.razorpay.com/v1/payments/${encodeURIComponent(paymentId)}`,
+    {
+      method: "GET",
+      headers: {
+        "Authorization": `Basic ${auth}`
+      }
+    }
+  );
+
+  const data = await response.json();
+
+  if (!response.ok) {
+    throw new Error(
+      data?.error?.description ||
+      "Unable to verify payment."
+    );
+  }
+
+  return data;
+}
+
+async function verifyPayment(env, orderId, paymentId, signature) {
+  if (!orderId || !paymentId || !signature) {
+    throw new Error("Payment information is incomplete.");
+  }
+
+  const generatedSignature = await hmacSHA256(
+    env.RAZORPAY_KEY_SECRET,
+    `${orderId}|${paymentId}`
+  );
+
+  if (generatedSignature !== signature) {
+    throw new Error("Invalid payment signature.");
+  }
+
+  const payment = await getRazorpayPayment(
+    env,
+    paymentId
+  );
+
+  if (payment.order_id !== orderId) {
+    throw new Error("Payment order mismatch.");
+  }
+
+  if (Number(payment.amount) !== PRICE) {
+    throw new Error("Payment amount mismatch.");
+  }
+
+  if (payment.currency !== CURRENCY) {
+    throw new Error("Payment currency mismatch.");
+  }
+
+  if (payment.status !== "captured") {
+    throw new Error(
+      `Payment is not captured. Current status: ${payment.status}`
+    );
+  }
+
+  return payment;
+}
+
 export default {
   async fetch(request, env) {
+
     if (request.method === "OPTIONS") {
       return new Response(null, {
         status: 204,
@@ -93,60 +269,36 @@ export default {
       });
     }
 
-    if (request.method !== "POST") {
+    const url = new URL(request.url);
+
+    // --------------------------------------------------
+    // HEALTH CHECK
+    // --------------------------------------------------
+
+    if (
+      request.method === "GET" &&
+      url.pathname === "/"
+    ) {
       return json({
         ok: true,
         message: "Sketch Art AI API is running"
       });
     }
 
-    try {
-      const form = await request.formData();
-      const photo = form.get("photo");
+    // --------------------------------------------------
+    // CREATE RAZORPAY ₹99 ORDER
+    // --------------------------------------------------
 
-      if (!photo || typeof photo === "string") {
+    if (
+      request.method === "POST" &&
+      url.pathname === "/api/create-order"
+    ) {
+      try {
+        const order = await createRazorpayOrder(env);
+
         return json({
-          error: "Please upload a photo."
-        }, 400);
-      }
-
-      if (!photo.type.startsWith("image/")) {
-        return json({
-          error: "Only image files are allowed."
-        }, 400);
-      }
-
-      if (photo.size > 10 * 1024 * 1024) {
-        return json({
-          error: "Image must be smaller than 10 MB."
-        }, 400);
-      }
-
-      const results = [];
-
-      for (const style of styles) {
-        const image = await generateImage(
-          env,
-          photo,
-          style.prompt
-        );
-
-        results.push({
-          name: style.name,
-          image: `data:image/png;base64,${image}`
-        });
-      }
-
-      return json({
-        success: true,
-        images: results
-      });
-
-    } catch (error) {
-      return json({
-        success: false,
-        error: error?.message || "Image generation failed."
-      }, 500);
-    }
-  }
-};
+          success: true,
+          key_id: env.RAZORPAY_KEY_ID,
+          order_id: order.id,
+          amount: order.amount,
+          currency: order.currency
