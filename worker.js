@@ -444,7 +444,7 @@ export default {
       success: false,
       error: "Endpoint not found."
     }, 404);
-
+  }
   } catch (error) {
     return json({
       success: false,
