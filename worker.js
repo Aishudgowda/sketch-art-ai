@@ -445,11 +445,12 @@ export default {
       error: "Endpoint not found."
     }, 404);
   }
-   catch (error) {
-    return json({
+ return json({
       success: false,
-      error: error?.message || "Request failed."
-    }, 500);
+      error: "Endpoint not found."
+    }, 404);
   }
-}
-};
+};  
+  
+
+
