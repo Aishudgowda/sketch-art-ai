@@ -302,3 +302,154 @@ export default {
           order_id: order.id,
           amount: order.amount,
           currency: order.currency
+});
+
+      } catch (error) {
+        return json({
+          success: false,
+          error: error?.message || "Unable to create payment order."
+        }, 500);
+      }
+    }
+
+    // PAID DOWNLOAD
+    if (
+      request.method === "POST" &&
+      url.pathname === "/api/download"
+    ) {
+      try {
+        const form = await request.formData();
+
+        const photo = form.get("photo");
+        const styleIndex = Number(form.get("styleIndex"));
+
+        const razorpayOrderId = form.get("razorpay_order_id");
+        const razorpayPaymentId = form.get("razorpay_payment_id");
+        const razorpaySignature = form.get("razorpay_signature");
+
+        if (!photo || typeof photo === "string") {
+          return json({
+            success: false,
+            error: "Photo is required."
+          }, 400);
+        }
+
+        if (!photo.type || !photo.type.startsWith("image/")) {
+          return json({
+            success: false,
+            error: "Only image files are allowed."
+          }, 400);
+        }
+
+        if (photo.size > 10 * 1024 * 1024) {
+          return json({
+            success: false,
+            error: "Image must be smaller than 10 MB."
+          }, 400);
+        }
+
+        if (
+          !Number.isInteger(styleIndex) ||
+          styleIndex < 0 ||
+          styleIndex >= styles.length
+        ) {
+          return json({
+            success: false,
+            error: "Invalid sketch style."
+          }, 400);
+        }
+
+        await verifyPayment(
+          env,
+          razorpayOrderId,
+          razorpayPaymentId,
+          razorpaySignature
+        );
+
+        const image = await generateImage(
+          env,
+          photo,
+          styles[styleIndex].prompt
+        );
+
+        return imageResponse(image);
+
+      } catch (error) {
+        return json({
+          success: false,
+          error: error?.message || "Paid download failed."
+        }, 500);
+      }
+    }
+
+    // FREE PREVIEW GENERATION
+    if (
+      request.method === "POST" &&
+      url.pathname === "/api/generate"
+    ) {
+      try {
+        const form = await request.formData();
+        const photo = form.get("photo");
+
+        if (!photo || typeof photo === "string") {
+          return json({
+            success: false,
+            error: "Please upload a photo."
+          }, 400);
+        }
+
+        if (!photo.type || !photo.type.startsWith("image/")) {
+          return json({
+            success: false,
+            error: "Only image files are allowed."
+          }, 400);
+        }
+
+        if (photo.size > 10 * 1024 * 1024) {
+          return json({
+            success: false,
+            error: "Image must be smaller than 10 MB."
+          }, 400);
+        }
+
+        const results = [];
+
+        for (const style of styles) {
+          const image = await generateImage(
+            env,
+            photo,
+            style.prompt
+          );
+
+          results.push({
+            name: style.name,
+            image: `data:image/png;base64,${image}`
+          });
+        }
+
+        return json({
+          success: true,
+          images: results
+        });
+
+      } catch (error) {
+        return json({
+          success: false,
+          error: error?.message || "Image generation failed."
+        }, 500);
+      }
+    }
+
+    return json({
+      success: false,
+      error: "Endpoint not found."
+    }, 404);
+
+  } catch (error) {
+    return json({
+      success: false,
+      error: error?.message || "Request failed."
+    }, 500);
+  }
+}
+};
