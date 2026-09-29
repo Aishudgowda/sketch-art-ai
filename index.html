@@ -1,0 +1,581 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sketch Art AI</title>
+
+<style>
+*{box-sizing:border-box}
+
+body{
+  margin:0;
+  font-family:Arial,sans-serif;
+  background:#f4f1ec;
+  color:#171717;
+}
+
+header{
+  text-align:center;
+  padding:28px 15px 18px;
+}
+
+header h1{
+  margin:0;
+  font-family:Georgia,serif;
+  font-size:32px;
+}
+
+header p{
+  color:#666;
+  margin:8px 0 0;
+}
+
+.container{
+  max-width:850px;
+  margin:auto;
+  padding:15px;
+}
+
+.upload{
+  background:white;
+  border:2px dashed #999;
+  border-radius:18px;
+  padding:30px 15px;
+  text-align:center;
+}
+
+.upload input{
+  display:none;
+}
+
+.upload label{
+  display:inline-block;
+  background:#171717;
+  color:white;
+  padding:14px 25px;
+  border-radius:30px;
+  cursor:pointer;
+  font-weight:bold;
+}
+
+#fileName{
+  margin-top:12px;
+  color:#666;
+}
+
+.preview{
+  text-align:center;
+  margin-top:20px;
+}
+
+.preview img{
+  max-width:100%;
+  max-height:380px;
+  border-radius:15px;
+  display:none;
+  margin:auto;
+  box-shadow:0 8px 25px #0002;
+}
+
+.generate{
+  width:100%;
+  margin-top:20px;
+  border:0;
+  padding:16px;
+  border-radius:30px;
+  background:#111;
+  color:white;
+  font-size:17px;
+  font-weight:bold;
+  cursor:pointer;
+}
+
+.generate:disabled{
+  opacity:.5;
+}
+
+#loading{
+  display:none;
+  text-align:center;
+  margin:25px 0;
+}
+
+.results{
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:18px;
+  margin-top:25px;
+}
+
+.card{
+  background:white;
+  border-radius:18px;
+  overflow:hidden;
+  box-shadow:0 5px 20px #0001;
+}
+
+.card img{
+  width:100%;
+  display:block;
+}
+
+.cardInfo{
+  padding:14px;
+}
+
+.cardInfo h3{
+  margin:0 0 8px;
+  font-family:Georgia,serif;
+}
+
+.download{
+  width:100%;
+  border:0;
+  padding:11px;
+  border-radius:20px;
+  background:#111;
+  color:white;
+  cursor:pointer;
+}
+
+.note{
+  text-align:center;
+  color:#777;
+  font-size:13px;
+  margin:25px 0;
+}
+
+@media(max-width:600px){
+  .results{
+    grid-template-columns:1fr;
+  }
+
+  header h1{
+    font-size:27px;
+  }
+}
+</style>
+</head>
+
+<body>
+
+<header>
+  <h1>✏️ Sketch Art AI</h1>
+  <p>Turn your photo into beautiful artistic sketches</p>
+</header>
+
+<div class="container">
+
+  <div class="upload">
+    <label for="photo">📷 Choose Your Photo</label>
+    <input id="photo" type="file" accept="image/*">
+    <div id="fileName">No photo selected</div>
+  </div>
+
+  <div class="preview">
+    <img id="preview">
+  </div>
+
+  <button id="generateBtn" class="generate" disabled>
+    ✨ Generate 4 Sketch Arts
+  </button>
+
+  <div id="loading">
+    <h3>Creating your artworks...</h3>
+    <p>Please wait ✨</p>
+  </div>
+
+  <div id="results" class="results"></div>
+
+  <div class="note">
+    Your original face is preserved because the sketch is created from your uploaded photo.
+  </div>
+
+</div>
+
+<script>
+
+const photoInput = document.getElementById("photo");
+const preview = document.getElementById("preview");
+const fileName = document.getElementById("fileName");
+const generateBtn = document.getElementById("generateBtn");
+const loading = document.getElementById("loading");
+const results = document.getElementById("results");
+
+let selectedFile = null;
+
+photoInput.addEventListener("change", function(){
+
+  selectedFile = this.files[0];
+
+  if(!selectedFile) return;
+
+  fileName.textContent = selectedFile.name;
+
+  const reader = new FileReader();
+
+  reader.onload = function(e){
+    preview.src = e.target.result;
+    preview.style.display = "block";
+  };
+
+  reader.readAsDataURL(selectedFile);
+
+  generateBtn.disabled = false;
+});
+
+generateBtn.addEventListener("click", async function(){
+
+  if(!selectedFile) return;
+
+  generateBtn.disabled = true;
+  loading.style.display = "block";
+  results.innerHTML = "";
+
+  try{
+
+    const image = await loadImage(selectedFile);
+
+    const styles = [
+      {
+        title:"Pencil Portrait",
+        mode:"pencil"
+      },
+      {
+        title:"Ink + Pencil",
+        mode:"ink"
+      },
+      {
+        title:"Time Travel Art",
+        mode:"time"
+      },
+      {
+        title:"Premium Sketch",
+        mode:"premium"
+      }
+    ];
+
+    for(const style of styles){
+
+      const canvas = createSketch(image, style.mode);
+
+      const imageData = canvas.toDataURL("image/png");
+
+      addResult(style.title, imageData);
+    }
+
+  }catch(error){
+
+    alert("Something went wrong. Please try another photo.");
+
+  }
+
+  loading.style.display = "none";
+  generateBtn.disabled = false;
+});
+
+function loadImage(file){
+
+  return new Promise((resolve,reject)=>{
+
+    const reader = new FileReader();
+
+    reader.onload = function(e){
+
+      const img = new Image();
+
+      img.onload = ()=>resolve(img);
+      img.onerror = reject;
+
+      img.src = e.target.result;
+    };
+
+    reader.onerror = reject;
+
+    reader.readAsDataURL(file);
+  });
+}
+
+function createSketch(img, mode){
+
+  const maxSize = 900;
+
+  let w = img.width;
+  let h = img.height;
+
+  if(w > maxSize || h > maxSize){
+
+    const scale = Math.min(maxSize/w,maxSize/h);
+
+    w = Math.round(w*scale);
+    h = Math.round(h*scale);
+  }
+
+  const canvas = document.createElement("canvas");
+
+  canvas.width = w;
+  canvas.height = h;
+
+  const ctx = canvas.getContext("2d");
+
+  ctx.drawImage(img,0,0,w,h);
+
+  const source = ctx.getImageData(0,0,w,h);
+  const output = ctx.createImageData(w,h);
+
+  const data = source.data;
+  const out = output.data;
+
+  for(let y=1;y<h-1;y++){
+
+    for(let x=1;x<w-1;x++){
+
+      const i=(y*w+x)*4;
+
+      const p00=gray(data,((y-1)*w+(x-1))*4);
+      const p01=gray(data,((y-1)*w+x)*4);
+      const p02=gray(data,((y-1)*w+(x+1))*4);
+
+      const p10=gray(data,(y*w+(x-1))*4);
+      const p12=gray(data,(y*w+(x+1))*4);
+
+      const p20=gray(data,((y+1)*w+(x-1))*4);
+      const p21=gray(data,((y+1)*w+x)*4);
+      const p22=gray(data,((y+1)*w+(x+1))*4);
+
+      const gx =
+        -p00 - 2*p10 - p20 +
+         p02 + 2*p12 + p22;
+
+      const gy =
+        -p00 - 2*p01 - p02 +
+         p20 + 2*p21 + p22;
+
+      let edge=Math.sqrt(gx*gx+gy*gy);
+
+      let value=255-edge*1.7;
+
+      if(mode==="ink"){
+        value=255-edge*2.3;
+      }
+
+      if(mode==="premium"){
+        value=255-edge*1.9;
+      }
+
+      value=Math.max(0,Math.min(255,value));
+
+      out[i]=value;
+      out[i+1]=value;
+      out[i+2]=value;
+      out[i+3]=255;
+    }
+  }
+
+  ctx.putImageData(output,0,0);
+
+  addPaperTexture(ctx,w,h);
+  addArtElements(ctx,w,h,mode);
+
+  return canvas;
+}
+
+function gray(data,i){
+
+  return (
+    data[i]*0.299+
+    data[i+1]*0.587+
+    data[i+2]*0.114
+  );
+}
+
+function addPaperTexture(ctx,w,h){
+
+  ctx.save();
+
+  ctx.globalAlpha=.035;
+
+  for(let i=0;i<2500;i++){
+
+    const x=Math.random()*w;
+    const y=Math.random()*h;
+
+    ctx.fillRect(x,y,1,1);
+  }
+
+  ctx.restore();
+}
+
+function addArtElements(ctx,w,h,mode){
+
+  ctx.save();
+
+  ctx.strokeStyle="#111";
+  ctx.fillStyle="#111";
+  ctx.lineWidth=Math.max(1,w/700);
+
+  if(mode==="time" || mode==="premium"){
+
+    drawClock(ctx,w*0.16,h*0.18,w*0.11);
+
+    drawGear(ctx,w*0.83,h*0.22,w*0.07);
+
+    drawGear(ctx,w*0.78,h*0.30,w*0.045);
+
+    drawPlane(ctx,w*0.80,h*0.72,w*0.13);
+
+    drawMotion(ctx,w*0.62,h*0.72,w*0.25);
+  }
+
+  if(mode==="ink"){
+
+    drawMotion(ctx,w*0.10,h*0.82,w*0.35);
+
+    drawMotion(ctx,w*0.55,h*0.15,w*0.30);
+  }
+
+  if(mode==="premium"){
+
+    drawClock(ctx,w*0.84,h*0.78,w*0.08);
+
+    drawGear(ctx,w*0.18,h*0.75,w*0.05);
+
+    drawMotion(ctx,w*0.20,h*0.12,w*0.22);
+  }
+
+  ctx.restore();
+}
+
+function drawClock(ctx,x,y,r){
+
+  ctx.beginPath();
+  ctx.arc(x,y,r,0,Math.PI*2);
+  ctx.stroke();
+
+  ctx.beginPath();
+  ctx.arc(x,y,r*.82,0,Math.PI*2);
+  ctx.stroke();
+
+  for(let i=0;i<12;i++){
+
+    const a=i*Math.PI/6;
+
+    const x1=x+Math.cos(a)*r*.68;
+    const y1=y+Math.sin(a)*r*.68;
+
+    const x2=x+Math.cos(a)*r*.82;
+    const y2=y+Math.sin(a)*r*.82;
+
+    ctx.beginPath();
+    ctx.moveTo(x1,y1);
+    ctx.lineTo(x2,y2);
+    ctx.stroke();
+  }
+
+  ctx.beginPath();
+  ctx.moveTo(x,y);
+  ctx.lineTo(x+r*.45,y-r*.25);
+  ctx.moveTo(x,y);
+  ctx.lineTo(x-r*.12,y-r*.48);
+  ctx.stroke();
+
+  ctx.beginPath();
+  ctx.arc(x,y,r*.04,0,Math.PI*2);
+  ctx.fill();
+}
+
+function drawGear(ctx,x,y,r){
+
+  const teeth=12;
+
+  ctx.beginPath();
+
+  for(let i=0;i<teeth*2;i++){
+
+    const a=i*Math.PI/teeth;
+    const rr=i%2===0?r:r*.78;
+
+    const px=x+Math.cos(a)*rr;
+    const py=y+Math.sin(a)*rr;
+
+    if(i===0) ctx.moveTo(px,py);
+    else ctx.lineTo(px,py);
+  }
+
+  ctx.closePath();
+  ctx.stroke();
+
+  ctx.beginPath();
+  ctx.arc(x,y,r*.30,0,Math.PI*2);
+  ctx.stroke();
+}
+
+function drawPlane(ctx,x,y,s){
+
+  ctx.beginPath();
+
+  ctx.moveTo(x-s,y);
+  ctx.lineTo(x+s,y);
+  ctx.moveTo(x,y);
+  ctx.lineTo(x+s*.35,y-s*.45);
+  ctx.moveTo(x,y);
+  ctx.lineTo(x+s*.35,y+s*.45);
+  ctx.moveTo(x-s*.35,y);
+  ctx.lineTo(x-s*.65,y-s*.22);
+  ctx.moveTo(x-s*.35,y);
+  ctx.lineTo(x-s*.65,y+s*.22);
+
+  ctx.stroke();
+}
+
+function drawMotion(ctx,x,y,length){
+
+  for(let i=0;i<5;i++){
+
+    ctx.beginPath();
+
+    ctx.moveTo(x,y+i*7);
+
+    ctx.quadraticCurveTo(
+      x+length*.45,
+      y-25+i*7,
+      x+length,
+      y+i*3
+    );
+
+    ctx.stroke();
+  }
+}
+
+function addResult(title,imageData){
+
+  const card=document.createElement("div");
+
+  card.className="card";
+
+  card.innerHTML=`
+    <img src="${imageData}">
+    <div class="cardInfo">
+      <h3>${title}</h3>
+      <button class="download">⬇️ Download</button>
+    </div>
+  `;
+
+  card.querySelector(".download").addEventListener("click",()=>{
+
+    const a=document.createElement("a");
+
+    a.href=imageData;
+    a.download=title.replaceAll(" ","-").toLowerCase()+".png";
+
+    a.click();
+  });
+
+  results.appendChild(card);
+}
+
+</script>
+
+</body>
+</html>
