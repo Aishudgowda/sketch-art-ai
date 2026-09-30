@@ -1,43 +1,102 @@
 const MODEL = "@cf/black-forest-labs/flux-2-klein-4b";
 
-const PRICE = 9900; // ₹99 in paise
-const CURRENCY = "INR";
-
-const styles = [
+const STYLES = [
   {
     name: "Pencil Portrait",
-    prompt: `Create a highly detailed professional hand-drawn pencil portrait from the reference photo.
-Preserve the same person's identity, facial structure, eyes, nose, lips, hairstyle and proportions.
-Monochrome graphite pencil on clean white paper, realistic facial shading, fine pencil strokes,
-delicate cross-hatching, rich tonal depth, natural skin texture, professional traditional sketch.
-No color, no cartoon, no simple edge filter, no distorted face.`
+    prompt: `
+Create a premium realistic hand-drawn graphite pencil portrait
+from the reference image.
+
+Keep the same person's identity, facial structure, eyes, nose,
+lips, hairstyle and proportions.
+
+Use detailed graphite pencil strokes, realistic shading,
+fine cross-hatching, natural skin detail and professional
+traditional portrait drawing.
+
+Monochrome pencil on clean white paper.
+Highly detailed.
+Realistic.
+No cartoon.
+No anime.
+No color.
+No distorted face.
+No extra people.
+`
   },
+
   {
     name: "Ink + Pencil",
-    prompt: `Transform the reference photo into a premium realistic hand-drawn ink and pencil portrait.
-Keep the same person's identity and recognizable facial features.
-Black ink outlines combined with detailed graphite shading, fine cross-hatching, artistic linework,
-white paper background, realistic proportions, professional illustration quality.
-No color, no cartoon, no simple tracing, no distorted face.`
+    prompt: `
+Transform the reference photo into a professional realistic
+black ink and graphite pencil portrait.
+
+Preserve the same person's identity and facial features.
+
+Use elegant ink linework combined with detailed pencil shading,
+fine cross-hatching, realistic proportions and natural facial
+details.
+
+White paper background.
+Premium traditional hand-drawn illustration.
+Monochrome.
+Highly detailed.
+No cartoon.
+No anime.
+No distorted face.
+`
   },
+
   {
     name: "Time Travel Art",
-    prompt: `Create a premium monochrome hand-drawn pencil and ink portrait using the reference photo.
-Preserve the same person's identity and facial features.
-Surround the portrait with an elegant vintage Roman numeral clock, mechanical gears,
-a small vintage airplane with motion trails, compass and subtle swirling time-travel arcs.
-Detailed graphite shading, fine cross-hatching, realistic face, white paper,
-professional artistic composition, dramatic but clean.
-No color, no cartoon, no readable text except clock numerals, no distorted face.`
+    prompt: `
+Create a premium realistic monochrome pencil and ink portrait
+using the reference image.
+
+Keep the same person's identity and recognizable facial features.
+
+Add elegant vintage time-travel artistic elements around the
+portrait:
+a Roman numeral clock, mechanical gears, compass,
+subtle airplane motion trails and flowing time lines.
+
+Make the face the main subject.
+
+Detailed graphite shading.
+Fine cross-hatching.
+Professional hand-drawn artwork.
+White paper.
+Black and graphite tones only.
+No cartoon.
+No anime.
+No distorted face.
+`
   },
+
   {
     name: "Premium Sketch",
-    prompt: `Create an exceptionally detailed premium realistic pencil-and-ink portrait from the reference photo.
-The person must remain clearly recognizable with the same facial structure and hairstyle.
-Use sophisticated fine-line drawing, realistic graphite shading, cross-hatching and deep tonal detail.
-Add subtle artistic decorative elements such as elegant gears, compass, clock and flowing sketch lines.
-White paper background, museum-quality traditional hand-drawn illustration.
-Monochrome only, no cartoon, no simple edge filter, no distorted face.`
+    prompt: `
+Create an exceptionally detailed premium realistic pencil sketch
+from the reference photo.
+
+Preserve the exact identity and recognizable facial structure.
+
+Use sophisticated fine-line drawing, realistic graphite shading,
+deep tonal detail, cross-hatching and professional portrait
+illustration techniques.
+
+Add subtle artistic gears, compass and elegant sketch lines
+around the subject.
+
+Museum-quality traditional hand-drawn appearance.
+White paper.
+Monochrome.
+Highly detailed.
+No cartoon.
+No anime.
+No color.
+No distorted face.
+`
   }
 ];
 
@@ -59,33 +118,17 @@ function json(data, status = 200) {
   });
 }
 
-function imageResponse(base64) {
-  const binary = Uint8Array.from(
-    atob(base64),
-    c => c.charCodeAt(0)
-  );
-
-  return new Response(binary, {
-    status: 200,
-    headers: {
-      "Content-Type": "image/png",
-      "Content-Disposition": "attachment; filename=\"sketch-art.png\"",
-      "Cache-Control": "no-store",
-      ...corsHeaders()
-    }
-  });
-}
-
-async function generateImage(env, imageBlob, prompt) {
+async function generateSketch(env, photo, prompt) {
   const form = new FormData();
 
   form.append(
     "input_image_0",
-    imageBlob,
-    "reference.png"
+    photo,
+    "reference.jpg"
   );
 
   form.append("prompt", prompt);
+
   form.append("width", "768");
   form.append("height", "1024");
   form.append("guidance", "3.5");
@@ -100,172 +143,16 @@ async function generateImage(env, imageBlob, prompt) {
   });
 
   if (!result || !result.image) {
-    throw new Error("AI image generation failed.");
+    throw new Error("AI did not return an image.");
   }
 
   return result.image;
 }
 
-function base64ToBytes(base64) {
-  const binary = atob(base64);
-  const bytes = new Uint8Array(binary.length);
-
-  for (let i = 0; i < binary.length; i++) {
-    bytes[i] = binary.charCodeAt(i);
-  }
-
-  return bytes;
-}
-
-function bytesToHex(bytes) {
-  return Array.from(bytes)
-    .map(b => b.toString(16).padStart(2, "0"))
-    .join("");
-}
-
-async function hmacSHA256(secret, message) {
-  const encoder = new TextEncoder();
-
-  const keyData = encoder.encode(secret);
-
-  const cryptoKey = await crypto.subtle.importKey(
-    "raw",
-    keyData,
-    {
-      name: "HMAC",
-      hash: "SHA-256"
-    },
-    false,
-    ["sign"]
-  );
-
-  const signature = await crypto.subtle.sign(
-    "HMAC",
-    cryptoKey,
-    encoder.encode(message)
-  );
-
-  return bytesToHex(new Uint8Array(signature));
-}
-
-async function createRazorpayOrder(env) {
-  if (!env.RAZORPAY_KEY_ID || !env.RAZORPAY_KEY_SECRET) {
-    throw new Error("Razorpay credentials are not configured.");
-  }
-
-  const auth = btoa(
-    `${env.RAZORPAY_KEY_ID}:${env.RAZORPAY_KEY_SECRET}`
-  );
-
-  const receipt =
-    "sketch_" +
-    Date.now() +
-    "_" +
-    crypto.randomUUID().replaceAll("-", "").slice(0, 10);
-
-  const response = await fetch(
-    "https://api.razorpay.com/v1/orders",
-    {
-      method: "POST",
-      headers: {
-        "Authorization": `Basic ${auth}`,
-        "Content-Type": "application/json"
-      },
-      body: JSON.stringify({
-        amount: PRICE,
-        currency: CURRENCY,
-        receipt: receipt
-      })
-    }
-  );
-
-  const data = await response.json();
-
-  if (!response.ok) {
-    throw new Error(
-      data?.error?.description ||
-      "Unable to create Razorpay order."
-    );
-  }
-
-  return data;
-}
-
-async function getRazorpayPayment(env, paymentId) {
-  const auth = btoa(
-    `${env.RAZORPAY_KEY_ID}:${env.RAZORPAY_KEY_SECRET}`
-  );
-
-  const response = await fetch(
-    `https://api.razorpay.com/v1/payments/${encodeURIComponent(paymentId)}`,
-    {
-      method: "GET",
-      headers: {
-        "Authorization": `Basic ${auth}`
-      }
-    }
-  );
-
-  const data = await response.json();
-
-  if (!response.ok) {
-    throw new Error(
-      data?.error?.description ||
-      "Unable to verify payment."
-    );
-  }
-
-  return data;
-}
-
-async function verifyPayment(
-  env,
-  orderId,
-  paymentId,
-  signature
-) {
-  if (!orderId || !paymentId || !signature) {
-    throw new Error("Payment information is incomplete.");
-  }
-
-  const generatedSignature = await hmacSHA256(
-    env.RAZORPAY_KEY_SECRET,
-    `${orderId}|${paymentId}`
-  );
-
-  if (generatedSignature !== signature) {
-    throw new Error("Invalid payment signature.");
-  }
-
-  const payment = await getRazorpayPayment(
-    env,
-    paymentId
-  );
-
-  if (payment.order_id !== orderId) {
-    throw new Error("Payment order mismatch.");
-  }
-
-  if (Number(payment.amount) !== PRICE) {
-    throw new Error("Payment amount mismatch.");
-  }
-
-  if (payment.currency !== CURRENCY) {
-    throw new Error("Payment currency mismatch.");
-  }
-
-  if (payment.status !== "captured") {
-    throw new Error(
-      `Payment is not captured. Current status: ${payment.status}`
-    );
-  }
-
-  return payment;
-}
-
 export default {
   async fetch(request, env) {
 
+    // CORS preflight
     if (request.method === "OPTIONS") {
       return new Response(null, {
         status: 204,
@@ -275,133 +162,40 @@ export default {
 
     const url = new URL(request.url);
 
-    // HEALTH CHECK
+    // API HOME
     if (
       request.method === "GET" &&
       url.pathname === "/"
     ) {
       return json({
-        ok: true,
-        message: "Sketch Art AI API is running"
+        success: true,
+        app: "Sketch Art AI",
+        status: "online"
       });
     }
 
-    // CREATE RAZORPAY ₹99 ORDER
+    // GENERATE ENDPOINT TEST
     if (
-      request.method === "POST" &&
-      url.pathname === "/api/create-order"
+      request.method === "GET" &&
+      url.pathname === "/api/generate"
     ) {
-      try {
-        const order = await createRazorpayOrder(env);
-
-        return json({
-          success: true,
-          key_id: env.RAZORPAY_KEY_ID,
-          order_id: order.id,
-          amount: order.amount,
-          currency: order.currency
-        });
-
-      } catch (error) {
-        return json({
-          success: false,
-          error:
-            error?.message ||
-            "Unable to create payment order."
-        }, 500);
-      }
+      return json({
+        success: false,
+        error: "This endpoint requires POST with an image."
+      }, 405);
     }
 
-    // PAID DOWNLOAD
-    if (
-      request.method === "POST" &&
-      url.pathname === "/api/download"
-    ) {
-      try {
-        const form = await request.formData();
-
-        const photo = form.get("photo");
-        const styleIndex = Number(
-          form.get("styleIndex")
-        );
-
-        const razorpayOrderId =
-          form.get("razorpay_order_id");
-
-        const razorpayPaymentId =
-          form.get("razorpay_payment_id");
-
-        const razorpaySignature =
-          form.get("razorpay_signature");
-
-        if (!photo || typeof photo === "string") {
-          return json({
-            success: false,
-            error: "Photo is required."
-          }, 400);
-        }
-
-        if (
-          !photo.type ||
-          !photo.type.startsWith("image/")
-        ) {
-          return json({
-            success: false,
-            error: "Only image files are allowed."
-          }, 400);
-        }
-
-        if (photo.size > 10 * 1024 * 1024) {
-          return json({
-            success: false,
-            error: "Image must be smaller than 10 MB."
-          }, 400);
-        }
-
-        if (
-          !Number.isInteger(styleIndex) ||
-          styleIndex < 0 ||
-          styleIndex >= styles.length
-        ) {
-          return json({
-            success: false,
-            error: "Invalid sketch style."
-          }, 400);
-        }
-
-        await verifyPayment(
-          env,
-          razorpayOrderId,
-          razorpayPaymentId,
-          razorpaySignature
-        );
-
-        const image = await generateImage(
-          env,
-          photo,
-          styles[styleIndex].prompt
-        );
-
-        return imageResponse(image);
-
-      } catch (error) {
-        return json({
-          success: false,
-          error:
-            error?.message ||
-            "Paid download failed."
-        }, 500);
-      }
-    }
-
-    // FREE PREVIEW GENERATION
+    // GENERATE 4 SKETCHES
     if (
       request.method === "POST" &&
       url.pathname === "/api/generate"
     ) {
+
       try {
-        const form = await request.formData();
-        const photo = form.get("photo");
+
+        const formData = await request.formData();
+
+        const photo = formData.get("photo");
 
         if (!photo || typeof photo === "string") {
           return json({
@@ -410,10 +204,7 @@ export default {
           }, 400);
         }
 
-        if (
-          !photo.type ||
-          !photo.type.startsWith("image/")
-        ) {
+        if (!photo.type.startsWith("image/")) {
           return json({
             success: false,
             error: "Only image files are allowed."
@@ -423,31 +214,37 @@ export default {
         if (photo.size > 10 * 1024 * 1024) {
           return json({
             success: false,
-            error: "Image must be smaller than 10 MB."
+            error: "Photo must be smaller than 10 MB."
           }, 400);
         }
 
-        const results = [];
+        const images = [];
 
-        for (const style of styles) {
-          const image = await generateImage(
-            env,
-            photo,
-            style.prompt
-          );
+        for (const style of STYLES) {
 
-          results.push({
+          const generatedImage =
+            await generateSketch(
+              env,
+              photo,
+              style.prompt
+            );
+
+          images.push({
             name: style.name,
-            image: `data:image/png;base64,${image}`
+            image:
+              "data:image/png;base64," +
+              generatedImage
           });
         }
 
         return json({
           success: true,
-          images: results
+          count: images.length,
+          images
         });
 
       } catch (error) {
+
         return json({
           success: false,
           error:
@@ -457,10 +254,9 @@ export default {
       }
     }
 
-    // UNKNOWN ENDPOINT
     return json({
       success: false,
       error: "Endpoint not found."
     }, 404);
   }
-};
+};+
