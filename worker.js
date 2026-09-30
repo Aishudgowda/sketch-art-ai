@@ -108,7 +108,6 @@ async function generateImage(env, imageBlob, prompt) {
 
 function base64ToBytes(base64) {
   const binary = atob(base64);
-
   const bytes = new Uint8Array(binary.length);
 
   for (let i = 0; i < binary.length; i++) {
@@ -219,7 +218,12 @@ async function getRazorpayPayment(env, paymentId) {
   return data;
 }
 
-async function verifyPayment(env, orderId, paymentId, signature) {
+async function verifyPayment(
+  env,
+  orderId,
+  paymentId,
+  signature
+) {
   if (!orderId || !paymentId || !signature) {
     throw new Error("Payment information is incomplete.");
   }
@@ -271,10 +275,7 @@ export default {
 
     const url = new URL(request.url);
 
-    // --------------------------------------------------
     // HEALTH CHECK
-    // --------------------------------------------------
-
     if (
       request.method === "GET" &&
       url.pathname === "/"
@@ -285,10 +286,7 @@ export default {
       });
     }
 
-    // --------------------------------------------------
     // CREATE RAZORPAY ₹99 ORDER
-    // --------------------------------------------------
-
     if (
       request.method === "POST" &&
       url.pathname === "/api/create-order"
@@ -302,12 +300,14 @@ export default {
           order_id: order.id,
           amount: order.amount,
           currency: order.currency
-});
+        });
 
       } catch (error) {
         return json({
           success: false,
-          error: error?.message || "Unable to create payment order."
+          error:
+            error?.message ||
+            "Unable to create payment order."
         }, 500);
       }
     }
@@ -321,11 +321,18 @@ export default {
         const form = await request.formData();
 
         const photo = form.get("photo");
-        const styleIndex = Number(form.get("styleIndex"));
+        const styleIndex = Number(
+          form.get("styleIndex")
+        );
 
-        const razorpayOrderId = form.get("razorpay_order_id");
-        const razorpayPaymentId = form.get("razorpay_payment_id");
-        const razorpaySignature = form.get("razorpay_signature");
+        const razorpayOrderId =
+          form.get("razorpay_order_id");
+
+        const razorpayPaymentId =
+          form.get("razorpay_payment_id");
+
+        const razorpaySignature =
+          form.get("razorpay_signature");
 
         if (!photo || typeof photo === "string") {
           return json({
@@ -334,7 +341,10 @@ export default {
           }, 400);
         }
 
-        if (!photo.type || !photo.type.startsWith("image/")) {
+        if (
+          !photo.type ||
+          !photo.type.startsWith("image/")
+        ) {
           return json({
             success: false,
             error: "Only image files are allowed."
@@ -377,7 +387,9 @@ export default {
       } catch (error) {
         return json({
           success: false,
-          error: error?.message || "Paid download failed."
+          error:
+            error?.message ||
+            "Paid download failed."
         }, 500);
       }
     }
@@ -398,7 +410,10 @@ export default {
           }, 400);
         }
 
-        if (!photo.type || !photo.type.startsWith("image/")) {
+        if (
+          !photo.type ||
+          !photo.type.startsWith("image/")
+        ) {
           return json({
             success: false,
             error: "Only image files are allowed."
@@ -435,22 +450,17 @@ export default {
       } catch (error) {
         return json({
           success: false,
-          error: error?.message || "Image generation failed."
+          error:
+            error?.message ||
+            "Image generation failed."
         }, 500);
       }
     }
 
+    // UNKNOWN ENDPOINT
     return json({
       success: false,
       error: "Endpoint not found."
     }, 404);
   }
- return json({
-      success: false,
-      error: "Endpoint not found."
-    }, 404);
-  }
-};  
-  
-
-
+};
