@@ -3,6 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
   <title>Sketch Art AI</title>
 
   <style>
@@ -56,11 +57,13 @@
 
     #preview {
       display: none;
-      max-width: 280px;
-      max-height: 280px;
-      margin: 15px auto;
-      border-radius: 12px;
+      width: 100%;
+      max-width: 320px;
+      max-height: 400px;
+      margin: 20px auto;
+      border-radius: 14px;
       object-fit: contain;
+      box-shadow: 0 4px 15px rgba(0,0,0,0.12);
     }
 
     button {
@@ -119,10 +122,6 @@
       color: #111;
     }
 
-    .locked {
-      position: relative;
-    }
-
     .lock-text {
       margin-top: 10px;
       font-size: 13px;
@@ -130,12 +129,7 @@
     }
 
     .price {
-      color: #111;
       font-weight: bold;
-    }
-
-    .hidden {
-      display: none;
     }
 
     footer {
@@ -168,11 +162,17 @@
       accept="image/*"
     >
 
-    <img id="preview" alt="Photo preview">
+    <img
+      id="preview"
+      alt="Your photo preview"
+    >
 
     <br>
 
-    <button id="generateBtn">
+    <button
+      id="generateBtn"
+      type="button"
+    >
       ✨ Generate 4 Sketches
     </button>
 
@@ -192,8 +192,8 @@
 <script>
 
 const API_URL =
-const API_URL =
   "https://sketch-art-ai-api.aishudgowda2004.workers.dev/api/generate";
+
 const photoInput =
   document.getElementById("photoInput");
 
@@ -210,34 +210,61 @@ const results =
   document.getElementById("results");
 
 
-/* Preview uploaded photo */
+/* =========================
+   PHOTO PREVIEW
+========================= */
 
-photoInput.addEventListener("change", () => {
+photoInput.addEventListener("change", function () {
 
-  const file = photoInput.files[0];
+  const file = this.files && this.files[0];
 
   if (!file) {
+    preview.removeAttribute("src");
     preview.style.display = "none";
     return;
   }
 
-  preview.src = URL.createObjectURL(file);
-  preview.style.display = "block";
+  if (!file.type.startsWith("image/")) {
+    alert("Please select an image file.");
+    this.value = "";
+    preview.style.display = "none";
+    return;
+  }
 
-  status.textContent = "";
+  const reader = new FileReader();
 
-  results.innerHTML = "";
+  reader.onload = function (event) {
+
+    preview.src = event.target.result;
+
+    preview.style.display = "block";
+
+    status.textContent = "";
+
+    results.innerHTML = "";
+  };
+
+  reader.onerror = function () {
+
+    preview.style.display = "none";
+
+    status.textContent =
+      "❌ Could not preview this photo.";
+  };
+
+  reader.readAsDataURL(file);
+
 });
 
 
-/*
-  Resize photo before sending.
-  FLUX reference images work best when kept small.
-*/
+/* =========================
+   RESIZE PHOTO
+========================= */
 
 async function resizeImage(file) {
 
-  const bitmap = await createImageBitmap(file);
+  const bitmap =
+    await createImageBitmap(file);
 
   const maxSize = 480;
 
@@ -247,9 +274,11 @@ async function resizeImage(file) {
   if (width > height) {
 
     if (width > maxSize) {
-      height = Math.round(
-        height * maxSize / width
-      );
+
+      height =
+        Math.round(
+          height * maxSize / width
+        );
 
       width = maxSize;
     }
@@ -257,9 +286,11 @@ async function resizeImage(file) {
   } else {
 
     if (height > maxSize) {
-      width = Math.round(
-        width * maxSize / height
-      );
+
+      width =
+        Math.round(
+          width * maxSize / height
+        );
 
       height = maxSize;
     }
@@ -271,7 +302,8 @@ async function resizeImage(file) {
   canvas.width = width;
   canvas.height = height;
 
-  const ctx = canvas.getContext("2d");
+  const ctx =
+    canvas.getContext("2d");
 
   ctx.drawImage(
     bitmap,
@@ -281,150 +313,182 @@ async function resizeImage(file) {
     height
   );
 
-  return new Promise(resolve => {
+  return new Promise(
+    (resolve, reject) => {
 
-    canvas.toBlob(
-      blob => resolve(blob),
-      "image/jpeg",
-      0.9
-    );
+      canvas.toBlob(
+        blob => {
 
-  });
+          if (!blob) {
+            reject(
+              new Error(
+                "Could not process photo."
+              )
+            );
+
+            return;
+          }
+
+          resolve(blob);
+        },
+        "image/jpeg",
+        0.9
+      );
+
+    }
+  );
 }
 
 
-/* Generate AI sketches */
+/* =========================
+   GENERATE SKETCHES
+========================= */
 
-generateBtn.addEventListener("click", async () => {
+generateBtn.addEventListener(
+  "click",
+  async function () {
 
-  const file = photoInput.files[0];
+    const file =
+      photoInput.files &&
+      photoInput.files[0];
 
-  if (!file) {
-    alert("Please upload a photo first.");
-    return;
-  }
+    if (!file) {
 
-  generateBtn.disabled = true;
-
-  status.textContent =
-    "✨ Creating your 4 professional sketches...";
-
-  results.innerHTML = "";
-
-  try {
-
-    const resizedPhoto =
-      await resizeImage(file);
-
-    const formData =
-      new FormData();
-
-    formData.append(
-      "photo",
-      resizedPhoto,
-      "photo.jpg"
-    );
-
-    const response =
-      await fetch(API_URL, {
-        method: "POST",
-        body: formData
-      });
-
-    const data =
-      await response.json();
-
-    if (!response.ok || !data.success) {
-
-      throw new Error(
-        data.error ||
-        "Generation failed."
+      alert(
+        "Please upload a photo first."
       );
+
+      return;
     }
 
-    status.textContent =
-      "🎉 Your 4 sketches are ready!";
-
-    showResults(data.images);
-
-  } catch (error) {
-
-    console.error(error);
+    generateBtn.disabled = true;
 
     status.textContent =
-      "❌ " + error.message;
+      "✨ Creating your 4 professional sketches...";
 
-  } finally {
+    results.innerHTML = "";
 
-    generateBtn.disabled = false;
+    try {
+
+      const resizedPhoto =
+        await resizeImage(file);
+
+      const formData =
+        new FormData();
+
+      formData.append(
+        "photo",
+        resizedPhoto,
+        "photo.jpg"
+      );
+
+      const response =
+        await fetch(
+          API_URL,
+          {
+            method: "POST",
+            body: formData
+          }
+        );
+
+      const data =
+        await response.json();
+
+      if (
+        !response.ok ||
+        !data.success
+      ) {
+
+        throw new Error(
+          data.error ||
+          "Generation failed."
+        );
+      }
+
+      status.textContent =
+        "🎉 Your 4 sketches are ready!";
+
+      showResults(
+        data.images
+      );
+
+    } catch (error) {
+
+      console.error(error);
+
+      status.textContent =
+        "❌ " +
+        (
+          error.message ||
+          "Something went wrong."
+        );
+
+    } finally {
+
+      generateBtn.disabled = false;
+    }
+
   }
+);
 
-});
 
-
-/* Display generated images */
+/* =========================
+   SHOW RESULTS
+========================= */
 
 function showResults(images) {
 
   results.innerHTML = "";
 
-  images.forEach((item, index) => {
+  if (
+    !images ||
+    !images.length
+  ) {
 
-    const card =
-      document.createElement("div");
+    status.textContent =
+      "❌ No images were returned.";
 
-    card.className = "card";
+    return;
+  }
 
-    const image =
-      document.createElement("img");
+  images.forEach(
+    function (item) {
 
-    image.src = item.image;
-    image.alt = item.name;
+      const card =
+        document.createElement("div");
 
-    const title =
-      document.createElement("h3");
+      card.className =
+        "card";
 
-    title.textContent =
-      item.name;
+      const image =
+        document.createElement("img");
 
-    const button =
-      document.createElement("button");
+      image.src =
+        item.image;
 
-    button.className =
-      "download-btn";
+      image.alt =
+        item.name;
 
-    button.textContent =
-      "🔒 Download — ₹99";
+      const title =
+        document.createElement("h3");
 
-    button.onclick = () => {
+      title.textContent =
+        item.name;
 
-      alert(
-        "Download will be unlocked after the ₹99 payment system is connected."
-      );
+      const button =
+        document.createElement("button");
 
-    };
+      button.className =
+        "download-btn";
 
-    const lockText =
-      document.createElement("div");
+      button.type =
+        "button";
 
-    lockText.className =
-      "lock-text";
+      button.textContent =
+        "🔒 Download — ₹99";
 
-    lockText.innerHTML =
-      'Preview is FREE • <span class="price">Download ₹99</span>';
+      button.onclick =
+        function () {
 
-    card.appendChild(image);
-    card.appendChild(title);
-    card.appendChild(button);
-    card.appendChild(lockText);
-
-    results.appendChild(card);
-
-  });
-
-}
-
-</script>
-
-</body>
-</html>
+          alert(
+            "Download will be unlocked after ₹99 payment."
