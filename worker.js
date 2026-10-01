@@ -308,7 +308,7 @@ export default {
               currency: CURRENCY,
               receipt:
                 "sketch_" +
-                body.sessionId,
+                receipt: "sketch_" + body.sessionId.slice(0, 30),
               notes: {
                 sessionId: body.sessionId,
                 photoHash: body.photoHash
