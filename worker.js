@@ -254,8 +254,158 @@ export default {
           photoHash,
           images
         });
+      } 
+      if (!body.sessionId || !body.photoHash) {
+          return json({
+            success: false,
+            error: "Session information missing."
+          }, 400);
+        }
+
+        const order = await razorpay("orders", env, {
+          method: "POST",
+          body: {
+            amount: PRICE,
+            currency: CURRENCY,
+            receipt: "sketch_" + body.sessionId,
+            notes: {
+              sessionId: body.sessionId,
+              photoHash: body.photoHash
+            }
+          }
+        });
+
+        return json({
+          success: true,
+          orderId: order.id,
+          amount: PRICE,
+          currency: CURRENCY,
+          keyId: env.RAZORPAY_KEY_ID
+        });
       }
 
+      if (request.method === "POST" && url.pathname === "/api/verify-payment") {
+        const form = await request.formData();
+
+        const sessionId = form.get("sessionId");
+        const photoHash = form.get("photoHash");
+        const orderId = form.get("razorpay_order_id");
+        const paymentId = form.get("razorpay_payment_id");
+        const signature = form.get("razorpay_signature");
+        const photo = form.get("photo");
+
+        if (!sessionId || !photoHash || !orderId || !paymentId ||
+            !signature || !photo || typeof photo === "string") {
+          return json({
+            success: false,
+            error: "Payment information is incomplete."
+          }, 400);
+        }
+
+        const bytes = new Uint8Array(
+          await photo.arrayBuffer()
+        );
+
+        if (await sha256(bytes) !== photoHash) {
+          return json({
+            success: false,
+            error: "Photo verification failed."
+          }, 400);
+        }
+
+        const expected = await razorpaySignature(
+          env,
+          orderId + "|" + paymentId
+        );
+
+        if (signature !== expected) {
+          return json({
+            success: false,
+            error: "Invalid payment signature."
+          }, 400);
+        }
+
+        const order = await razorpay(
+          "orders/" + orderId,
+          env
+        );
+
+        if (
+          order.amount !== PRICE ||
+          order.currency !== CURRENCY
+        ) {
+          return json({
+            success: false,
+            error: "Payment amount verification failed."
+          }, 400);
+        }
+
+        if (
+          order.notes?.sessionId !== sessionId ||
+          order.notes?.photoHash !== photoHash
+        ) {
+          return json({
+            success: false,
+            error: "Payment session mismatch."
+          }, 400);
+        }
+
+        const payment = await razorpay(
+          "payments/" + paymentId,
+          env
+        );
+
+        if (
+          payment.order_id !== orderId ||
+          payment.amount !== PRICE ||
+          payment.currency !== CURRENCY ||
+          payment.status !== "captured"
+        ) {
+          return json({
+            success: false,
+            error: "Payment has not been successfully captured."
+          }, 400);
+        }
+
+        const images = [];
+
+        for (const style of styles) {
+          const image = await generateImage(
+            env,
+            bytes,
+            style.prompt,
+            1024,
+            1365
+          );
+
+          images.push({
+            name: style.name,
+            image:
+              `data:image/png;base64,${bytesToBase64(image)}`
+          });
+        }
+
+        return json({
+          success: true,
+          images
+        });
+      }
+
+      return json({
+        success: false,
+        error: "Endpoint not found."
+      }, 404);
+
+    } catch (error) {
+
+      return json({
+        success: false,
+        error: error?.message || "Server error."
+      }, 500);
+    }
+  }
+};
+ 
       if (
         request.method === "POST" &&
         url.pathname === "/api/create-order"
