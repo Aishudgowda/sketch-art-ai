@@ -1,52 +1,59 @@
 const MODEL = "@cf/black-forest-labs/flux-2-klein-4b";
-const PRICE = 9900;
+
+const PRICE = 9900; // ₹99 in paise
 const CURRENCY = "INR";
 
 const styles = [
   {
     name: "Pencil Portrait",
-    prompt: `Create a highly detailed professional hand-drawn pencil portrait from the reference photo. Preserve the same person's identity, facial structure, eyes, nose, lips, hairstyle and proportions. Monochrome graphite pencil on clean white paper, realistic facial shading, fine pencil strokes, delicate cross-hatching, rich tonal depth, professional traditional sketch. No color, no cartoon, no simple edge filter, no distorted face.`
+    prompt: `Create a highly detailed professional hand-drawn pencil portrait from the reference photo.
+Preserve the exact identity, facial structure, eyes, nose, lips, hairstyle and proportions of the same person.
+Use realistic graphite pencil strokes, fine linework, natural shading, cross-hatching and subtle paper texture.
+This must look like an authentic professional artist's pencil portrait, not a basic edge filter.
+Clean white background, highly detailed face, realistic human proportions.`
   },
   {
     name: "Ink + Pencil",
-    prompt: `Create a premium realistic hand-drawn ink and pencil portrait from the reference photo. Keep the same person's identity and recognizable facial features. Black ink outlines combined with detailed graphite shading, fine cross-hatching, artistic linework, white paper background, realistic proportions, professional illustration quality. No color, no cartoon, no simple tracing, no distorted face.`
+    prompt: `Transform the reference photo into a premium realistic ink and pencil sketch.
+Preserve the exact same person's identity and facial features.
+Use fine black ink outlines combined with realistic graphite shading, cross-hatching and detailed hand-drawn strokes.
+Professional portrait-art quality, natural shadows, accurate proportions, clean paper background.
+Do not make it look like a cartoon or simple photo filter.`
   },
   {
     name: "Time Travel Art",
-    prompt: `Create a premium monochrome hand-drawn pencil and ink portrait from the reference photo. Preserve the same person's identity and facial features. Add an elegant vintage clock, mechanical gears, small vintage airplane with motion trails, compass and subtle time-travel arcs around the portrait. Detailed graphite shading, fine cross-hatching, realistic face, white paper. No color, no cartoon, no distorted face.`
+    prompt: `Create a premium realistic hand-drawn time-travel pencil artwork using the reference photo.
+Preserve the exact identity and facial features of the same person.
+Create detailed graphite and ink sketch work with realistic shading and cross-hatching.
+Add tasteful artistic time-travel elements around the portrait such as a vintage clock, subtle gears,
+airplane silhouette, compass and motion lines.
+The person's face must remain the main focus and highly recognizable.
+Professional detailed concept-art quality, white paper background.`
   },
   {
     name: "Premium Sketch",
-    prompt: `Create an exceptionally detailed premium realistic pencil-and-ink portrait from the reference photo. Keep the same person's identity, facial structure and hairstyle. Use sophisticated fine-line drawing, realistic graphite shading and cross-hatching. Add subtle gears, compass, clock and flowing sketch lines. White paper background, professional traditional hand-drawn illustration. Monochrome only, no cartoon, no distorted face.`
+    prompt: `Create an ultra-detailed premium professional pencil and ink portrait from the reference photo.
+Keep the exact same person's identity, face shape, eyes, nose, lips, hair and proportions.
+Use sophisticated graphite shading, fine artistic linework, cross-hatching and realistic hand-drawn texture.
+Make it look like an expensive commissioned portrait created by a professional artist.
+Highly realistic, elegant, detailed and clean. No cartoon effect and no simple edge detection.`
   }
 ];
 
-const CORS = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Methods": "GET,POST,OPTIONS",
-  "Access-Control-Allow-Headers": "Content-Type"
-};
+function corsHeaders() {
+  return {
+    "Access-Control-Allow-Origin": "*",
+    "Access-Control-Allow-Methods": "GET,POST,OPTIONS",
+    "Access-Control-Allow-Headers": "Content-Type",
+    "Content-Type": "application/json"
+  };
+}
 
 function json(data, status = 200) {
   return new Response(JSON.stringify(data), {
     status,
-    headers: {
-      "Content-Type": "application/json",
-      ...CORS
-    }
+    headers: corsHeaders()
   });
-}
-
-function bytesToBase64(bytes) {
-  let binary = "";
-
-  for (let i = 0; i < bytes.length; i += 0x8000) {
-    binary += String.fromCharCode(
-      ...bytes.subarray(i, i + 0x8000)
-    );
-  }
-
-  return btoa(binary);
 }
 
 function base64ToBytes(base64) {
@@ -60,614 +67,478 @@ function base64ToBytes(base64) {
   return bytes;
 }
 
-function hex(bytes) {
-  return [...new Uint8Array(bytes)]
-    .map(
-      byte => byte.toString(16).padStart(2, "0")
-    )
+function dataUrlToBytes(dataUrl) {
+  if (!dataUrl || typeof dataUrl !== "string") {
+    throw new Error("Photo is missing");
+  }
+
+  const match = dataUrl.match(/^data:([^;]+);base64,(.+)$/);
+
+  if (!match) {
+    throw new Error("Invalid photo format");
+  }
+
+  return {
+    mime: match[1],
+    bytes: base64ToBytes(match[2])
+  };
+}
+
+function bytesToBase64(bytes) {
+  let binary = "";
+  const chunk = 0x8000;
+
+  for (let i = 0; i < bytes.length; i += chunk) {
+    binary += String.fromCharCode(
+      ...bytes.subarray(i, Math.min(i + chunk, bytes.length))
+    );
+  }
+
+  return btoa(binary);
+}
+
+async function sha256(text) {
+  const data = new TextEncoder().encode(text);
+  const hash = await crypto.subtle.digest("SHA-256", data);
+
+  return [...new Uint8Array(hash)]
+    .map(b => b.toString(16).padStart(2, "0"))
     .join("");
 }
 
-async function sha256(bytes) {
-  return hex(
-    await crypto.subtle.digest(
-      "SHA-256",
-      bytes
-    )
-  );
+function safeEqual(a, b) {
+  if (!a || !b || a.length !== b.length) return false;
+
+  let result = 0;
+
+  for (let i = 0; i < a.length; i++) {
+    result |= a.charCodeAt(i) ^ b.charCodeAt(i);
+  }
+
+  return result === 0;
 }
 
-async function hmacHex(secret, text) {
-  const key =
-    await crypto.subtle.importKey(
-      "raw",
-      new TextEncoder().encode(secret),
-      {
-        name: "HMAC",
-        hash: "SHA-256"
-      },
-      false,
-      ["sign"]
-    );
-
-  return hex(
-    await crypto.subtle.sign(
-      "HMAC",
-      key,
-      new TextEncoder().encode(text)
-    )
+async function hmacSHA256(secret, message) {
+  const key = await crypto.subtle.importKey(
+    "raw",
+    new TextEncoder().encode(secret),
+    {
+      name: "HMAC",
+      hash: "SHA-256"
+    },
+    false,
+    ["sign"]
   );
+
+  const signature = await crypto.subtle.sign(
+    "HMAC",
+    key,
+    new TextEncoder().encode(message)
+  );
+
+  return [...new Uint8Array(signature)]
+    .map(b => b.toString(16).padStart(2, "0"))
+    .join("");
 }
 
-async function razorpay(
-  path,
-  env,
-  method = "GET",
-  body
-) {
-  const auth = btoa(
-    env.RAZORPAY_KEY_ID +
-    ":" +
-    env.RAZORPAY_KEY_SECRET
+async function razorpayRequest(env, path, options = {}) {
+  const credentials = btoa(
+    `${env.RAZORPAY_KEY_ID}:${env.RAZORPAY_KEY_SECRET}`
   );
 
   const response = await fetch(
-    "https://api.razorpay.com/v1/" + path,
+    `https://api.razorpay.com/v1${path}`,
     {
-      method,
-
+      ...options,
       headers: {
-        "Authorization":
-          "Basic " + auth,
-
-        "Content-Type":
-          "application/json"
-      },
-
-      body: body
-        ? JSON.stringify(body)
-        : undefined
+        "Authorization": `Basic ${credentials}`,
+        "Content-Type": "application/json",
+        ...(options.headers || {})
+      }
     }
   );
 
-  const data =
-    await response.json();
+  const text = await response.text();
+
+  let data;
+
+  try {
+    data = JSON.parse(text);
+  } catch {
+    data = { raw: text };
+  }
 
   if (!response.ok) {
     throw new Error(
       data?.error?.description ||
-      "Razorpay request failed."
+      data?.error?.code ||
+      "Razorpay request failed"
     );
   }
 
   return data;
 }
 
-async function generate(
-  env,
-  bytes,
-  styleIndex,
-  width,
-  height
-) {
-  const style =
-    styles[styleIndex];
+async function generateSketch(env, photoDataUrl, styleIndex) {
+  const style = styles[styleIndex];
 
   if (!style) {
-    throw new Error(
-      "Invalid sketch style."
-    );
+    throw new Error("Invalid sketch style");
   }
 
-  const form =
-    new FormData();
+  const photo = dataUrlToBytes(photoDataUrl);
 
-  form.append(
-    "input_image_0",
-    new Blob(
-      [bytes],
-      { type: "image/jpeg" }
-    ),
-    "reference.jpg"
-  );
+  /*
+    FLUX.2 [klein] requires reference images below 512x512.
+    The frontend should resize the uploaded photo to <=510px.
+  */
 
-  form.append(
-    "prompt",
-    style.prompt
-  );
+  const form = new FormData();
 
-  form.append(
-    "width",
-    String(width)
-  );
+  form.append("prompt", style.prompt);
+  form.append("input_image_0", new Blob([photo.bytes], {
+    type: photo.mime
+  }), "reference.jpg");
 
-  form.append(
-    "height",
-    String(height)
-  );
+  form.append("width", "1024");
+  form.append("height", "1024");
+  form.append("guidance", "4");
 
-  form.append(
-    "guidance",
-    "3.5"
-  );
+  const formResponse = new Response(form);
 
-  const request =
-    new Response(form);
+  const result = await env.AI.run(MODEL, {
+    multipart: {
+      body: formResponse.body,
+      contentType: formResponse.headers.get("content-type")
+    }
+  });
 
-  const result =
-    await env.AI.run(
-      MODEL,
-      {
-        multipart: {
-          body: request.body,
+  let imageBytes;
 
-          contentType:
-            request.headers.get(
-              "content-type"
-            )
-        }
+  if (result instanceof ReadableStream) {
+    imageBytes = new Uint8Array(
+      await new Response(result).arrayBuffer()
+    );
+  } else if (result?.image) {
+    if (typeof result.image === "string") {
+      return result.image.startsWith("data:")
+        ? result.image
+        : `data:image/png;base64,${result.image}`;
+    }
+
+    imageBytes = result.image;
+  } else if (result instanceof Uint8Array) {
+    imageBytes = result;
+  } else if (result instanceof ArrayBuffer) {
+    imageBytes = new Uint8Array(result);
+  } else {
+    throw new Error("AI returned an unexpected image response");
+  }
+
+  return `data:image/png;base64,${bytesToBase64(imageBytes)}`;
+}
+
+async function createOrder(env, sessionId, photoHash) {
+  if (!env.RAZORPAY_KEY_ID || !env.RAZORPAY_KEY_SECRET) {
+    throw new Error("Razorpay is not configured");
+  }
+
+  const cleanSession = String(sessionId || "")
+    .replace(/[^a-zA-Z0-9]/g, "")
+    .slice(0, 32);
+
+  if (!cleanSession) {
+    throw new Error("Invalid session");
+  }
+
+  const cleanHash = String(photoHash || "")
+    .replace(/[^a-fA-F0-9]/g, "")
+    .slice(0, 64);
+
+  if (!cleanHash) {
+    throw new Error("Invalid photo hash");
+  }
+
+  const order = await razorpayRequest(env, "/orders", {
+    method: "POST",
+    body: JSON.stringify({
+      amount: PRICE,
+      currency: CURRENCY,
+      receipt: `sk_${cleanSession}`,
+      notes: {
+        product: "Sketch Art AI HD Download",
+        session_id: cleanSession,
+        photo_hash: cleanHash
       }
-    );
+    })
+  });
 
-  if (!result?.image) {
-    throw new Error(
-      "AI image generation failed."
-    );
-  }
-
-  return {
-    name: style.name,
-
-    image:
-      "data:image/png;base64," +
-      bytesToBase64(
-        base64ToBytes(
-          result.image
-        )
-      )
-  };
+  return order;
 }
 
-async function getPhoto(form) {
-  const photo =
-    form.get("photo");
+async function verifyPayment(env, body) {
+  const {
+    razorpay_order_id,
+    razorpay_payment_id,
+    razorpay_signature,
+    sessionId,
+    photoHash,
+    photo,
+    style
+  } = body;
 
   if (
-    !photo ||
-    typeof photo === "string"
-  ) {
-    throw new Error(
-      "Please upload a photo."
-    );
-  }
-
-  if (
-    !photo.type.startsWith(
-      "image/"
-    )
-  ) {
-    throw new Error(
-      "Only image files are allowed."
-    );
-  }
-
-  if (
-    photo.size >
-    10 * 1024 * 1024
-  ) {
-    throw new Error(
-      "Image must be smaller than 10 MB."
-    );
-  }
-
-  return new Uint8Array(
-    await photo.arrayBuffer()
-  );
-}
-
-async function verifyPayment(
-  env,
-  form,
-  bytes
-) {
-  const sessionId =
-    String(
-      form.get("sessionId") || ""
-    );
-
-  const photoHash =
-    String(
-      form.get("photoHash") || ""
-    );
-
-  const orderId =
-    String(
-      form.get(
-        "razorpay_order_id"
-      ) || ""
-    );
-
-  const paymentId =
-    String(
-      form.get(
-        "razorpay_payment_id"
-      ) || ""
-    );
-
-  const signature =
-    String(
-      form.get(
-        "razorpay_signature"
-      ) || ""
-    );
-
-  if (
+    !razorpay_order_id ||
+    !razorpay_payment_id ||
+    !razorpay_signature ||
     !sessionId ||
     !photoHash ||
-    !orderId ||
-    !paymentId ||
-    !signature
+    !photo
   ) {
-    throw new Error(
-      "Payment information is incomplete."
-    );
+    throw new Error("Payment verification data is incomplete");
   }
 
-  const actualHash =
-    await sha256(bytes);
+  const expectedSignature = await hmacSHA256(
+    env.RAZORPAY_KEY_SECRET,
+    `${razorpay_order_id}|${razorpay_payment_id}`
+  );
+
+  if (!safeEqual(expectedSignature, razorpay_signature)) {
+    throw new Error("Invalid payment signature");
+  }
+
+  const order = await razorpayRequest(
+    env,
+    `/orders/${encodeURIComponent(razorpay_order_id)}`
+  );
+
+  if (!order) {
+    throw new Error("Order not found");
+  }
+
+  if (Number(order.amount) !== PRICE) {
+    throw new Error("Invalid payment amount");
+  }
+
+  if (String(order.currency) !== CURRENCY) {
+    throw new Error("Invalid payment currency");
+  }
+
+  const payment = await razorpayRequest(
+    env,
+    `/payments/${encodeURIComponent(razorpay_payment_id)}`
+  );
+
+  if (!payment) {
+    throw new Error("Payment not found");
+  }
+
+  if (String(payment.order_id) !== String(razorpay_order_id)) {
+    throw new Error("Payment does not belong to this order");
+  }
+
+  if (String(payment.status) !== "captured") {
+    throw new Error("Payment is not captured");
+  }
+
+  const orderNotes = order.notes || {};
 
   if (
-    actualHash !== photoHash
+    orderNotes.session_id &&
+    String(orderNotes.session_id) !==
+      String(sessionId).replace(/[^a-zA-Z0-9]/g, "").slice(0, 32)
   ) {
-    throw new Error(
-      "Photo verification failed."
-    );
-  }
-
-  const expected =
-    await hmacHex(
-      env.RAZORPAY_KEY_SECRET,
-      orderId +
-      "|" +
-      paymentId
-    );
-
-  if (
-    signature !== expected
-  ) {
-    throw new Error(
-      "Invalid payment signature."
-    );
-  }
-
-  const order =
-    await razorpay(
-      "orders/" + orderId,
-      env
-    );
-
-  if (
-    order.amount !== PRICE ||
-    order.currency !== CURRENCY
-  ) {
-    throw new Error(
-      "Payment amount verification failed."
-    );
+    throw new Error("Session verification failed");
   }
 
   if (
-    order.notes?.sessionId !==
-      sessionId ||
-    order.notes?.photoHash !==
-      photoHash
+    orderNotes.photo_hash &&
+    String(orderNotes.photo_hash) !== String(photoHash)
   ) {
-    throw new Error(
-      "Payment session mismatch."
-    );
+    throw new Error("Photo verification failed");
   }
 
-  const payment =
-    await razorpay(
-      "payments/" + paymentId,
-      env
-    );
+  const actualPhotoHash = await sha256(photo);
+
+  if (!safeEqual(
+    actualPhotoHash,
+    String(photoHash)
+  )) {
+    throw new Error("Photo does not match the original request");
+  }
+
+  const styleIndex = Number(style);
 
   if (
-    payment.order_id !== orderId ||
-    payment.amount !== PRICE ||
-    payment.currency !== CURRENCY ||
-    payment.status !== "captured"
+    !Number.isInteger(styleIndex) ||
+    styleIndex < 0 ||
+    styleIndex >= styles.length
   ) {
-    throw new Error(
-      "Payment has not been successfully captured."
-    );
+    throw new Error("Invalid sketch style");
   }
+
+  const image = await generateSketch(
+    env,
+    photo,
+    styleIndex
+  );
+
+  return {
+    success: true,
+    image,
+    name: `${styles[styleIndex].name} HD`
+  };
 }
 
 export default {
   async fetch(request, env) {
-
-    if (
-      request.method ===
-      "OPTIONS"
-    ) {
-      return new Response(
-        null,
-        {
-          status: 204,
-          headers: CORS
+    if (request.method === "OPTIONS") {
+      return new Response(null, {
+        status: 204,
+        headers: {
+          "Access-Control-Allow-Origin": "*",
+          "Access-Control-Allow-Methods": "GET,POST,OPTIONS",
+          "Access-Control-Allow-Headers": "Content-Type"
         }
-      );
-    }
-
-    const url =
-      new URL(request.url);
-
-    if (
-      request.method === "GET" &&
-      url.pathname === "/"
-    ) {
-      return json({
-        ok: true,
-        service:
-          "Sketch Art AI",
-        worldwide: true
       });
     }
 
+    const url = new URL(request.url);
+
     try {
-
-      /* CONFIG */
-
+      // Health check
       if (
         request.method === "GET" &&
-        url.pathname ===
-          "/api/config"
+        url.pathname === "/"
       ) {
         return json({
-          success: true,
-          keyId:
-            env.RAZORPAY_KEY_ID
+          ok: true,
+          service: "Sketch Art AI",
+          worldwide: true,
+          version: "2.0"
         });
       }
 
+      // Frontend configuration
+      if (
+        request.method === "GET" &&
+        url.pathname === "/api/config"
+      ) {
+        return json({
+          success: true,
+          razorpayKeyId: env.RAZORPAY_KEY_ID || "",
+          price: PRICE,
+          currency: CURRENCY
+        });
+      }
 
-      /*
-        ONE PREVIEW REQUEST
-        Frontend will send 4 separate
-        requests in parallel.
-      */
-
+      // Generate one preview
       if (
         request.method === "POST" &&
-        url.pathname ===
-          "/api/generate-one"
+        url.pathname === "/api/generate-one"
       ) {
+        const body = await request.json();
 
-        const form =
-          await request.formData();
+        const {
+          photo,
+          style,
+          sessionId
+        } = body;
 
-        const styleIndex =
-          Number(
-            form.get("style")
-          );
+        if (!photo) {
+          return json({
+            success: false,
+            error: "Photo is required"
+          }, 400);
+        }
+
+        if (!sessionId) {
+          return json({
+            success: false,
+            error: "Session is required"
+          }, 400);
+        }
+
+        const styleIndex = Number(style);
 
         if (
-          !Number.isInteger(
-            styleIndex
-          ) ||
+          !Number.isInteger(styleIndex) ||
           styleIndex < 0 ||
-          styleIndex > 3
+          styleIndex >= styles.length
         ) {
-          return json(
-            {
-              success: false,
-              error:
-                "Invalid sketch style."
-            },
-            400
-          );
+          return json({
+            success: false,
+            error: "Invalid style"
+          }, 400);
         }
 
-        const bytes =
-          await getPhoto(form);
+        const photoHash = await sha256(photo);
 
-        const photoHash =
-          await sha256(bytes);
-
-        const result =
-          await generate(
-            env,
-            bytes,
-            styleIndex,
-            512,
-            682
-          );
-
-        return json({
-          success: true,
-
-          sessionId:
-            String(
-              form.get(
-                "sessionId"
-              ) ||
-              crypto.randomUUID()
-            ),
-
-          photoHash,
-
-          ...result
-        });
-      }
-
-
-      /*
-        RAZORPAY ORDER
-      */
-
-      if (
-        request.method === "POST" &&
-        url.pathname ===
-          "/api/create-order"
-      ) {
-
-        const body =
-          await request.json();
-
-        if (
-          !body.sessionId ||
-          !body.photoHash
-        ) {
-          return json(
-            {
-              success: false,
-              error:
-                "Session information missing."
-            },
-            400
-          );
-        }
-
-        const cleanSession =
-          String(
-            body.sessionId
-          ).replace(
-            /[^a-zA-Z0-9]/g,
-            ""
-          );
-
-        const receipt =
-          "sk_" +
-          cleanSession.slice(
-            0,
-            32
-          );
-
-        const order =
-          await razorpay(
-            "orders",
-            env,
-            "POST",
-            {
-              amount: PRICE,
-
-              currency:
-                CURRENCY,
-
-              receipt,
-
-              notes: {
-                sessionId:
-                  body.sessionId,
-
-                photoHash:
-                  body.photoHash
-              }
-            }
-          );
-
-        return json({
-          success: true,
-
-          orderId:
-            order.id,
-
-          amount:
-            PRICE,
-
-          currency:
-            CURRENCY,
-
-          keyId:
-            env.RAZORPAY_KEY_ID
-        });
-      }
-
-
-      /*
-        ONE HD REQUEST
-        Frontend will send 4 separate
-        requests in parallel after payment.
-      */
-
-      if (
-        request.method === "POST" &&
-        url.pathname ===
-          "/api/verify-payment-one"
-      ) {
-
-        const form =
-          await request.formData();
-
-        const styleIndex =
-          Number(
-            form.get("style")
-          );
-
-        if (
-          !Number.isInteger(
-            styleIndex
-          ) ||
-          styleIndex < 0 ||
-          styleIndex > 3
-        ) {
-          return json(
-            {
-              success: false,
-              error:
-                "Invalid sketch style."
-            },
-            400
-          );
-        }
-
-        const bytes =
-          await getPhoto(form);
-
-        await verifyPayment(
+        const image = await generateSketch(
           env,
-          form,
-          bytes
+          photo,
+          styleIndex
         );
 
-        const result =
-          await generate(
-            env,
-            bytes,
-            styleIndex,
-            1024,
-            1365
-          );
-
         return json({
           success: true,
-          ...result
+          sessionId,
+          photoHash,
+          style: styleIndex,
+          name: styles[styleIndex].name,
+          image
         });
       }
 
+      // Create ₹99 Razorpay order
+      if (
+        request.method === "POST" &&
+        url.pathname === "/api/create-order"
+      ) {
+        const body = await request.json();
 
-      return json(
-        {
-          success: false,
-          error:
-            "Endpoint not found."
-        },
-        404
-      );
+        const order = await createOrder(
+          env,
+          body.sessionId,
+          body.photoHash
+        );
+
+        return json({
+          success: true,
+          key: env.RAZORPAY_KEY_ID,
+          orderId: order.id,
+          amount: order.amount,
+          currency: order.currency
+        });
+      }
+
+      // Verify ₹99 payment and generate HD image
+      if (
+        request.method === "POST" &&
+        url.pathname === "/api/verify-payment-one"
+      ) {
+        const body = await request.json();
+
+        const result = await verifyPayment(
+          env,
+          body
+        );
+
+        return json(result);
+      }
+
+      return json({
+        success: false,
+        error: "Endpoint not found"
+      }, 404);
 
     } catch (error) {
+      console.error("Sketch Art AI error:", error);
 
-      return json(
-        {
-          success: false,
-
-          error:
-            error?.message ||
-            "Server error."
-        },
-        500
-      );
+      return json({
+        success: false,
+        error: error?.message || "Something went wrong"
+      }, 500);
     }
   }
 };
