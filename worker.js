@@ -21,31 +21,28 @@ const styles = [
   }
 ];
 
-function cors() {
-  return {
-    "Access-Control-Allow-Origin": "*",
-    "Access-Control-Allow-Methods": "GET,POST,OPTIONS",
-    "Access-Control-Allow-Headers": "Content-Type"
-  };
-}
+const CORS = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Methods": "GET,POST,OPTIONS",
+  "Access-Control-Allow-Headers": "Content-Type"
+};
 
 function json(data, status = 200) {
   return new Response(JSON.stringify(data), {
     status,
     headers: {
       "Content-Type": "application/json",
-      ...cors()
+      ...CORS
     }
   });
 }
 
 function bytesToBase64(bytes) {
   let binary = "";
-  const chunk = 0x8000;
 
-  for (let i = 0; i < bytes.length; i += chunk) {
+  for (let i = 0; i < bytes.length; i += 0x8000) {
     binary += String.fromCharCode(
-      ...bytes.subarray(i, i + chunk)
+      ...bytes.subarray(i, i + 0x8000)
     );
   }
 
@@ -65,17 +62,49 @@ function base64ToBytes(base64) {
 
 function hex(bytes) {
   return [...new Uint8Array(bytes)]
-    .map(x => x.toString(16).padStart(2, "0"))
+    .map(
+      byte => byte.toString(16).padStart(2, "0")
+    )
     .join("");
 }
 
 async function sha256(bytes) {
   return hex(
-    await crypto.subtle.digest("SHA-256", bytes)
+    await crypto.subtle.digest(
+      "SHA-256",
+      bytes
+    )
   );
 }
 
-async function razorpay(path, env, options = {}) {
+async function hmacHex(secret, text) {
+  const key =
+    await crypto.subtle.importKey(
+      "raw",
+      new TextEncoder().encode(secret),
+      {
+        name: "HMAC",
+        hash: "SHA-256"
+      },
+      false,
+      ["sign"]
+    );
+
+  return hex(
+    await crypto.subtle.sign(
+      "HMAC",
+      key,
+      new TextEncoder().encode(text)
+    )
+  );
+}
+
+async function razorpay(
+  path,
+  env,
+  method = "GET",
+  body
+) {
   const auth = btoa(
     env.RAZORPAY_KEY_ID +
     ":" +
@@ -85,18 +114,24 @@ async function razorpay(path, env, options = {}) {
   const response = await fetch(
     "https://api.razorpay.com/v1/" + path,
     {
-      method: options.method || "GET",
+      method,
+
       headers: {
-        "Authorization": "Basic " + auth,
-        "Content-Type": "application/json"
+        "Authorization":
+          "Basic " + auth,
+
+        "Content-Type":
+          "application/json"
       },
-      body: options.body
-        ? JSON.stringify(options.body)
+
+      body: body
+        ? JSON.stringify(body)
         : undefined
     }
   );
 
-  const data = await response.json();
+  const data =
+    await response.json();
 
   if (!response.ok) {
     throw new Error(
@@ -108,61 +143,71 @@ async function razorpay(path, env, options = {}) {
   return data;
 }
 
-async function razorpaySignature(env, text) {
-  const key = await crypto.subtle.importKey(
-    "raw",
-    new TextEncoder().encode(
-      env.RAZORPAY_KEY_SECRET
-    ),
-    {
-      name: "HMAC",
-      hash: "SHA-256"
-    },
-    false,
-    ["sign"]
-  );
-
-  const result = await crypto.subtle.sign(
-    "HMAC",
-    key,
-    new TextEncoder().encode(text)
-  );
-
-  return hex(result);
-}
-
-async function generateImage(
+async function generate(
   env,
-  referenceBytes,
-  prompt,
+  bytes,
+  styleIndex,
   width,
   height
 ) {
-  const form = new FormData();
+  const style =
+    styles[styleIndex];
+
+  if (!style) {
+    throw new Error(
+      "Invalid sketch style."
+    );
+  }
+
+  const form =
+    new FormData();
 
   form.append(
     "input_image_0",
     new Blob(
-      [referenceBytes],
+      [bytes],
       { type: "image/jpeg" }
     ),
     "reference.jpg"
   );
 
-  form.append("prompt", prompt);
-  form.append("width", String(width));
-  form.append("height", String(height));
-  form.append("guidance", "3.5");
+  form.append(
+    "prompt",
+    style.prompt
+  );
 
-  const multipart = new Response(form);
+  form.append(
+    "width",
+    String(width)
+  );
 
-  const result = await env.AI.run(MODEL, {
-    multipart: {
-      body: multipart.body,
-      contentType:
-        multipart.headers.get("content-type")
-    }
-  });
+  form.append(
+    "height",
+    String(height)
+  );
+
+  form.append(
+    "guidance",
+    "3.5"
+  );
+
+  const request =
+    new Response(form);
+
+  const result =
+    await env.AI.run(
+      MODEL,
+      {
+        multipart: {
+          body: request.body,
+
+          contentType:
+            request.headers.get(
+              "content-type"
+            )
+        }
+      }
+    );
 
   if (!result?.image) {
     throw new Error(
@@ -170,19 +215,193 @@ async function generateImage(
     );
   }
 
-  return base64ToBytes(result.image);
+  return {
+    name: style.name,
+
+    image:
+      "data:image/png;base64," +
+      bytesToBase64(
+        base64ToBytes(
+          result.image
+        )
+      )
+  };
+}
+
+async function getPhoto(form) {
+  const photo =
+    form.get("photo");
+
+  if (
+    !photo ||
+    typeof photo === "string"
+  ) {
+    throw new Error(
+      "Please upload a photo."
+    );
+  }
+
+  if (
+    !photo.type.startsWith(
+      "image/"
+    )
+  ) {
+    throw new Error(
+      "Only image files are allowed."
+    );
+  }
+
+  if (
+    photo.size >
+    10 * 1024 * 1024
+  ) {
+    throw new Error(
+      "Image must be smaller than 10 MB."
+    );
+  }
+
+  return new Uint8Array(
+    await photo.arrayBuffer()
+  );
+}
+
+async function verifyPayment(
+  env,
+  form,
+  bytes
+) {
+  const sessionId =
+    String(
+      form.get("sessionId") || ""
+    );
+
+  const photoHash =
+    String(
+      form.get("photoHash") || ""
+    );
+
+  const orderId =
+    String(
+      form.get(
+        "razorpay_order_id"
+      ) || ""
+    );
+
+  const paymentId =
+    String(
+      form.get(
+        "razorpay_payment_id"
+      ) || ""
+    );
+
+  const signature =
+    String(
+      form.get(
+        "razorpay_signature"
+      ) || ""
+    );
+
+  if (
+    !sessionId ||
+    !photoHash ||
+    !orderId ||
+    !paymentId ||
+    !signature
+  ) {
+    throw new Error(
+      "Payment information is incomplete."
+    );
+  }
+
+  const actualHash =
+    await sha256(bytes);
+
+  if (
+    actualHash !== photoHash
+  ) {
+    throw new Error(
+      "Photo verification failed."
+    );
+  }
+
+  const expected =
+    await hmacHex(
+      env.RAZORPAY_KEY_SECRET,
+      orderId +
+      "|" +
+      paymentId
+    );
+
+  if (
+    signature !== expected
+  ) {
+    throw new Error(
+      "Invalid payment signature."
+    );
+  }
+
+  const order =
+    await razorpay(
+      "orders/" + orderId,
+      env
+    );
+
+  if (
+    order.amount !== PRICE ||
+    order.currency !== CURRENCY
+  ) {
+    throw new Error(
+      "Payment amount verification failed."
+    );
+  }
+
+  if (
+    order.notes?.sessionId !==
+      sessionId ||
+    order.notes?.photoHash !==
+      photoHash
+  ) {
+    throw new Error(
+      "Payment session mismatch."
+    );
+  }
+
+  const payment =
+    await razorpay(
+      "payments/" + paymentId,
+      env
+    );
+
+  if (
+    payment.order_id !== orderId ||
+    payment.amount !== PRICE ||
+    payment.currency !== CURRENCY ||
+    payment.status !== "captured"
+  ) {
+    throw new Error(
+      "Payment has not been successfully captured."
+    );
+  }
 }
 
 export default {
   async fetch(request, env) {
-    if (request.method === "OPTIONS") {
-      return new Response(null, {
-        status: 204,
-        headers: cors()
-      });
+
+    if (
+      request.method ===
+      "OPTIONS"
+    ) {
+      return new Response(
+        null,
+        {
+          status: 204,
+          headers: CORS
+        }
+      );
     }
 
-    const url = new URL(request.url);
+    const url =
+      new URL(request.url);
 
     if (
       request.method === "GET" &&
@@ -190,100 +409,111 @@ export default {
     ) {
       return json({
         ok: true,
-        service: "Sketch Art AI",
+        service:
+          "Sketch Art AI",
         worldwide: true
       });
     }
 
     try {
+
+      /* CONFIG */
+
       if (
         request.method === "GET" &&
-        url.pathname === "/api/config"
+        url.pathname ===
+          "/api/config"
       ) {
         return json({
           success: true,
-          keyId: env.RAZORPAY_KEY_ID
+          keyId:
+            env.RAZORPAY_KEY_ID
         });
       }
 
+
+      /*
+        ONE PREVIEW REQUEST
+        Frontend will send 4 separate
+        requests in parallel.
+      */
+
       if (
         request.method === "POST" &&
-        url.pathname === "/api/generate"
+        url.pathname ===
+          "/api/generate-one"
       ) {
-        const form = await request.formData();
-        const photo = form.get("photo");
+
+        const form =
+          await request.formData();
+
+        const styleIndex =
+          Number(
+            form.get("style")
+          );
 
         if (
-          !photo ||
-          typeof photo === "string"
+          !Number.isInteger(
+            styleIndex
+          ) ||
+          styleIndex < 0 ||
+          styleIndex > 3
         ) {
           return json(
             {
               success: false,
-              error: "Please upload a photo."
-            },
-            400
-          );
-        }
-
-        if (!photo.type.startsWith("image/")) {
-          return json(
-            {
-              success: false,
-              error: "Only image files are allowed."
-            },
-            400
-          );
-        }
-
-        if (photo.size > 10 * 1024 * 1024) {
-          return json(
-            {
-              success: false,
               error:
-                "Image must be smaller than 10 MB."
+                "Invalid sketch style."
             },
             400
           );
         }
 
-        const bytes = new Uint8Array(
-          await photo.arrayBuffer()
-        );
+        const bytes =
+          await getPhoto(form);
 
-        const photoHash = await sha256(bytes);
-        const images = [];
+        const photoHash =
+          await sha256(bytes);
 
-        for (const style of styles) {
-          const image = await generateImage(
+        const result =
+          await generate(
             env,
             bytes,
-            style.prompt,
+            styleIndex,
             512,
             682
           );
 
-          images.push({
-            name: style.name,
-            image:
-              "data:image/png;base64," +
-              bytesToBase64(image)
-          });
-        }
-
         return json({
           success: true,
-          sessionId: crypto.randomUUID(),
+
+          sessionId:
+            String(
+              form.get(
+                "sessionId"
+              ) ||
+              crypto.randomUUID()
+            ),
+
           photoHash,
-          images
+
+          ...result
         });
       }
 
+
+      /*
+        RAZORPAY ORDER
+      */
+
       if (
         request.method === "POST" &&
-        url.pathname === "/api/create-order"
+        url.pathname ===
+          "/api/create-order"
       ) {
-        const body = await request.json();
+
+        const body =
+          await request.json();
 
         if (
           !body.sessionId ||
@@ -292,212 +522,146 @@ export default {
           return json(
             {
               success: false,
-              error: "Session information missing."
+              error:
+                "Session information missing."
             },
             400
           );
         }
 
-        const order = await razorpay(
-          "orders",
-          env,
-          {
-            method: "POST",
-            body: {
+        const cleanSession =
+          String(
+            body.sessionId
+          ).replace(
+            /[^a-zA-Z0-9]/g,
+            ""
+          );
+
+        const receipt =
+          "sk_" +
+          cleanSession.slice(
+            0,
+            32
+          );
+
+        const order =
+          await razorpay(
+            "orders",
+            env,
+            "POST",
+            {
               amount: PRICE,
-              currency: CURRENCY,
-              receipt:
-                "sketch_" +
-                receipt: "sketch_" + body.sessionId.slice(0, 30),
+
+              currency:
+                CURRENCY,
+
+              receipt,
+
               notes: {
-                sessionId: body.sessionId,
-                photoHash: body.photoHash
+                sessionId:
+                  body.sessionId,
+
+                photoHash:
+                  body.photoHash
               }
             }
-          }
-        );
+          );
 
         return json({
           success: true,
-          orderId: order.id,
-          amount: PRICE,
-          currency: CURRENCY,
-          keyId: env.RAZORPAY_KEY_ID
+
+          orderId:
+            order.id,
+
+          amount:
+            PRICE,
+
+          currency:
+            CURRENCY,
+
+          keyId:
+            env.RAZORPAY_KEY_ID
         });
       }
 
+
+      /*
+        ONE HD REQUEST
+        Frontend will send 4 separate
+        requests in parallel after payment.
+      */
+
       if (
         request.method === "POST" &&
-        url.pathname === "/api/verify-payment"
+        url.pathname ===
+          "/api/verify-payment-one"
       ) {
-        const form = await request.formData();
 
-        const sessionId =
-          form.get("sessionId");
+        const form =
+          await request.formData();
 
-        const photoHash =
-          form.get("photoHash");
-
-        const orderId =
-          form.get("razorpay_order_id");
-
-        const paymentId =
-          form.get("razorpay_payment_id");
-
-        const signature =
-          form.get("razorpay_signature");
-
-        const photo =
-          form.get("photo");
+        const styleIndex =
+          Number(
+            form.get("style")
+          );
 
         if (
-          !sessionId ||
-          !photoHash ||
-          !orderId ||
-          !paymentId ||
-          !signature ||
-          !photo ||
-          typeof photo === "string"
+          !Number.isInteger(
+            styleIndex
+          ) ||
+          styleIndex < 0 ||
+          styleIndex > 3
         ) {
           return json(
             {
               success: false,
               error:
-                "Payment information is incomplete."
+                "Invalid sketch style."
             },
             400
           );
         }
 
-        const bytes = new Uint8Array(
-          await photo.arrayBuffer()
+        const bytes =
+          await getPhoto(form);
+
+        await verifyPayment(
+          env,
+          form,
+          bytes
         );
 
-        if (
-          await sha256(bytes) !==
-          photoHash
-        ) {
-          return json(
-            {
-              success: false,
-              error:
-                "Photo verification failed."
-            },
-            400
-          );
-        }
-
-        const expected =
-          await razorpaySignature(
-            env,
-            orderId + "|" + paymentId
-          );
-
-        if (signature !== expected) {
-          return json(
-            {
-              success: false,
-              error:
-                "Invalid payment signature."
-            },
-            400
-          );
-        }
-
-        const order = await razorpay(
-          "orders/" + orderId,
-          env
-        );
-
-        if (
-          order.amount !== PRICE ||
-          order.currency !== CURRENCY
-        ) {
-          return json(
-            {
-              success: false,
-              error:
-                "Payment amount verification failed."
-            },
-            400
-          );
-        }
-
-        if (
-          order.notes?.sessionId !==
-            sessionId ||
-          order.notes?.photoHash !==
-            photoHash
-        ) {
-          return json(
-            {
-              success: false,
-              error:
-                "Payment session mismatch."
-            },
-            400
-          );
-        }
-
-        const payment =
-          await razorpay(
-            "payments/" + paymentId,
-            env
-          );
-
-        if (
-          payment.order_id !== orderId ||
-          payment.amount !== PRICE ||
-          payment.currency !== CURRENCY ||
-          payment.status !== "captured"
-        ) {
-          return json(
-            {
-              success: false,
-              error:
-                "Payment has not been successfully captured."
-            },
-            400
-          );
-        }
-
-        const images = [];
-
-        for (const style of styles) {
-          const image = await generateImage(
+        const result =
+          await generate(
             env,
             bytes,
-            style.prompt,
+            styleIndex,
             1024,
             1365
           );
 
-          images.push({
-            name: style.name,
-            image:
-              "data:image/png;base64," +
-              bytesToBase64(image)
-          });
-        }
-
         return json({
           success: true,
-          images
+          ...result
         });
       }
+
 
       return json(
         {
           success: false,
-          error: "Endpoint not found."
+          error:
+            "Endpoint not found."
         },
         404
       );
 
     } catch (error) {
+
       return json(
         {
           success: false,
+
           error:
             error?.message ||
             "Server error."
