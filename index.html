@@ -23,9 +23,9 @@
 
     header {
       background: #000;
-      color: white;
+      color: #fff;
       text-align: center;
-      padding: 24px 16px;
+      padding: 25px 15px;
     }
 
     header h1 {
@@ -44,7 +44,7 @@
     }
 
     .card {
-      background: white;
+      background: #fff;
       border-radius: 18px;
       padding: 22px;
       margin-bottom: 20px;
@@ -81,24 +81,23 @@
       cursor: pointer;
     }
 
+    button:disabled {
+      opacity: .5;
+      cursor: not-allowed;
+    }
+
     #generateBtn {
       width: 100%;
       margin-top: 20px;
       background: #000;
-      color: white;
-    }
-
-    #generateBtn:disabled,
-    #payBtn:disabled {
-      opacity: .5;
-      cursor: not-allowed;
+      color: #fff;
     }
 
     #status {
       text-align: center;
       margin-top: 18px;
-      font-weight: bold;
       min-height: 24px;
+      font-weight: bold;
     }
 
     .results {
@@ -109,10 +108,10 @@
 
     .result {
       background: #fafafa;
+      border: 1px solid #ddd;
       border-radius: 15px;
       padding: 12px;
       text-align: center;
-      border: 1px solid #ddd;
     }
 
     .result img {
@@ -127,42 +126,39 @@
     }
 
     .locked {
-      font-size: 13px;
       color: #777;
+      font-size: 13px;
     }
 
-    .payment {
+    #paymentCard,
+    #hdCard,
+    #resultsCard {
       display: none;
+    }
+
+    #paymentCard {
       text-align: center;
       border: 2px solid #111;
     }
 
-    .payment h2 {
-      margin-top: 0;
-    }
-
     .price {
-      font-size: 30px;
+      font-size: 32px;
       font-weight: bold;
-      margin: 10px 0 18px;
+      margin: 12px 0 18px;
     }
 
     #payBtn {
-      background: #111;
-      color: white;
       width: 100%;
-      max-width: 400px;
-    }
-
-    .hd {
-      display: none;
+      max-width: 420px;
+      background: #000;
+      color: #fff;
     }
 
     .download {
       width: 100%;
       margin-top: 10px;
-      background: #111;
-      color: white;
+      background: #000;
+      color: #fff;
     }
 
     footer {
@@ -174,7 +170,7 @@
 
     @media (max-width: 600px) {
       header h1 {
-        font-size: 23px;
+        font-size: 24px;
       }
 
       .results {
@@ -209,7 +205,11 @@
         accept="image/*"
       >
 
-      <img id="preview" alt="Photo preview">
+      <img
+        id="preview"
+        alt="Photo preview"
+        draggable="false"
+      >
     </div>
 
     <button id="generateBtn">
@@ -221,7 +221,7 @@
   </div>
 
 
-  <div id="resultsCard" class="card" style="display:none;">
+  <div id="resultsCard" class="card">
 
     <h2>🎨 Your Sketches</h2>
 
@@ -230,7 +230,7 @@
   </div>
 
 
-  <div id="paymentCard" class="card payment">
+  <div id="paymentCard" class="card">
 
     <h2>🔓 Unlock HD Downloads</h2>
 
@@ -251,7 +251,7 @@
   </div>
 
 
-  <div id="hdCard" class="card hd">
+  <div id="hdCard" class="card">
 
     <h2>✨ Your HD Sketches</h2>
 
@@ -308,48 +308,72 @@ let sessionId = null;
 let photoHash = null;
 
 
-function setStatus(message, error = false) {
-  statusBox.textContent = message;
-  statusBox.style.color = error ? "#d00" : "#111";
+/* Status */
+function setStatus(text, error = false) {
+
+  statusBox.textContent = text;
+
+  statusBox.style.color =
+    error ? "#d00000" : "#111";
+
 }
 
 
-/*
-  Resize the uploaded photo to maximum 510px.
-  Cloudflare FLUX.2 klein reference images must be
-  smaller than 512 x 512.
-*/
+/* Resize photo */
 async function resizePhoto(file) {
 
   return new Promise((resolve, reject) => {
 
-    const reader = new FileReader();
+    const reader =
+      new FileReader();
 
     reader.onload = () => {
 
-      const img = new Image();
+      const img =
+        new Image();
 
       img.onload = () => {
 
         const maxSize = 510;
 
-        let width = img.width;
-        let height = img.height;
+        let width =
+          img.naturalWidth;
+
+        let height =
+          img.naturalHeight;
 
         const scale =
-          Math.min(1, maxSize / Math.max(width, height));
+          Math.min(
+            1,
+            maxSize /
+              Math.max(
+                width,
+                height
+              )
+          );
 
-        width = Math.round(width * scale);
-        height = Math.round(height * scale);
+        width =
+          Math.round(
+            width * scale
+          );
+
+        height =
+          Math.round(
+            height * scale
+          );
 
         const canvas =
-          document.createElement("canvas");
+          document.createElement(
+            "canvas"
+          );
 
         canvas.width = width;
         canvas.height = height;
 
         const ctx =
-          canvas.getContext("2d");
+          canvas.getContext(
+            "2d"
+          );
 
         ctx.drawImage(
           img,
@@ -363,9 +387,13 @@ async function resizePhoto(file) {
           blob => {
 
             if (!blob) {
+
               reject(
-                new Error("Photo processing failed.")
+                new Error(
+                  "Photo processing failed."
+                )
               );
+
               return;
             }
 
@@ -374,506 +402,674 @@ async function resizePhoto(file) {
                 [blob],
                 "photo.jpg",
                 {
-                  type: "image/jpeg"
+                  type:
+                    "image/jpeg"
                 }
               )
             );
 
           },
           "image/jpeg",
-          0.90
+          0.9
         );
 
       };
 
       img.onerror = () => {
+
         reject(
-          new Error("Could not read the photo.")
+          new Error(
+            "Could not read photo."
+          )
         );
+
       };
 
-      img.src = reader.result;
+      img.src =
+        reader.result;
     };
 
     reader.onerror = () => {
+
       reject(
-        new Error("Could not load the photo.")
+        new Error(
+          "Could not load photo."
+        )
       );
+
     };
 
     reader.readAsDataURL(file);
+
   });
+
 }
 
 
-/* Photo preview */
-photoInput.addEventListener("change", async () => {
+/* Preview uploaded photo */
+photoInput.addEventListener(
+  "change",
+  () => {
 
-  const file = photoInput.files[0];
+    const file =
+      photoInput.files[0];
 
-  if (!file) {
-    preview.style.display = "none";
-    return;
-  }
+    if (!file) {
 
-  if (!file.type.startsWith("image/")) {
-    setStatus(
-      "Please select an image.",
-      true
-    );
-    return;
-  }
+      preview.style.display =
+        "none";
 
-  preview.src =
-    URL.createObjectURL(file);
-
-  preview.style.display = "block";
-
-  setStatus("");
-});
-
-
-/* Generate 4 previews */
-generateBtn.addEventListener("click", async () => {
-
-  const file =
-    photoInput.files[0];
-
-  if (!file) {
-
-    setStatus(
-      "Please upload a photo first.",
-      true
-    );
-
-    return;
-  }
-
-  try {
-
-    generateBtn.disabled = true;
-
-    paymentCard.style.display = "none";
-    resultsCard.style.display = "none";
-    hdCard.style.display = "none";
-
-    results.innerHTML = "";
-    hdResults.innerHTML = "";
-
-    setStatus(
-      "Creating your 4 AI sketches..."
-    );
-
-    resizedPhoto =
-      await resizePhoto(file);
-
-
-    const form =
-      new FormData();
-
-    form.append(
-      "photo",
-      resizedPhoto,
-      "photo.jpg"
-    );
-
-
-    const response =
-      await fetch(
-        API_URL + "/api/generate",
-        {
-          method: "POST",
-          body: form
-        }
-      );
-
-
-    const data =
-      await response.json();
-
-
-    if (!response.ok || !data.success) {
-
-      throw new Error(
-        data.error ||
-        "Sketch generation failed."
-      );
-
+      return;
     }
-
-
-    sessionId =
-      data.sessionId;
-
-    photoHash =
-      data.photoHash;
-
-
-    results.innerHTML = "";
-
-
-    data.images.forEach(item => {
-
-      const box =
-        document.createElement("div");
-
-      box.className = "result";
-
-      box.innerHTML = `
-        <img
-          src="${item.image}"
-          alt="${item.name}"
-          draggable="false"
-        >
-
-        <h3>${item.name}</h3>
-
-        <div class="locked">
-          🔒 HD download locked
-        </div>
-      `;
-
-      results.appendChild(box);
-
-    });
-
-
-    resultsCard.style.display = "block";
-
-    paymentCard.style.display = "block";
-
-    setStatus(
-      "4 sketches created. Pay ₹99 to unlock HD downloads."
-    );
-
-
-  } catch (error) {
-
-    console.error(error);
-
-    setStatus(
-      error.message ||
-      "Something went wrong.",
-      true
-    );
-
-  } finally {
-
-    generateBtn.disabled = false;
-
-  }
-
-});
-
-
-/* Payment */
-payBtn.addEventListener("click", async () => {
-
-  if (!sessionId || !photoHash || !resizedPhoto) {
-
-    setStatus(
-      "Please generate the sketches again.",
-      true
-    );
-
-    return;
-  }
-
-
-  try {
-
-    payBtn.disabled = true;
-
-    setStatus(
-      "Opening secure payment..."
-    );
-
-
-    /*
-      Create Razorpay order
-    */
-    const orderResponse =
-      await fetch(
-        API_URL + "/api/create-order",
-        {
-          method: "POST",
-          headers: {
-            "Content-Type":
-              "application/json"
-          },
-          body: JSON.stringify({
-            sessionId: sessionId,
-            photoHash: photoHash
-          })
-        }
-      );
-
-
-    const orderData =
-      await orderResponse.json();
-
 
     if (
-      !orderResponse.ok ||
-      !orderData.success
+      !file.type.startsWith(
+        "image/"
+      )
     ) {
 
-      throw new Error(
-        orderData.error ||
-        "Could not create payment order."
+      setStatus(
+        "Please select an image.",
+        true
       );
 
+      return;
     }
 
+    preview.src =
+      URL.createObjectURL(file);
 
-    if (
-      typeof Razorpay === "undefined"
-    ) {
+    preview.style.display =
+      "block";
 
-      throw new Error(
-        "Payment system could not load. Please try again."
-      );
-
-    }
-
-
-    const options = {
-
-      key: orderData.keyId,
-
-      amount: orderData.amount,
-
-      currency: orderData.currency,
-
-      name: "Sketch Art AI",
-
-      description:
-        "Unlock 4 HD AI Sketches",
-
-      order_id:
-        orderData.orderId,
-
-      handler:
-        async function(payment) {
-
-          await verifyPayment(payment);
-
-        },
-
-      modal: {
-
-        ondismiss: function() {
-
-          payBtn.disabled = false;
-
-          setStatus(
-            "Payment window closed."
-          );
-
-        }
-
-      },
-
-      theme: {
-        color: "#000000"
-      }
-
-    };
-
-
-    const razorpay =
-      new Razorpay(options);
-
-
-    razorpay.on(
-      "payment.failed",
-      function(response) {
-
-        console.error(
-          response.error
-        );
-
-        payBtn.disabled = false;
-
-        setStatus(
-          response.error?.description ||
-          "Payment failed. Please try again.",
-          true
-        );
-
-      }
-    );
-
-
-    razorpay.open();
-
-
-  } catch (error) {
-
-    console.error(error);
-
-    payBtn.disabled = false;
-
-    setStatus(
-      error.message ||
-      "Payment could not start.",
-      true
-    );
+    setStatus("");
 
   }
-
-});
+);
 
 
 /*
-  Verify payment and generate HD images
+  Generate 4 images in PARALLEL.
 */
-async function verifyPayment(payment) {
+generateBtn.addEventListener(
+  "click",
+  async () => {
 
-  try {
+    const file =
+      photoInput.files[0];
 
-    setStatus(
-      "Payment successful. Verifying and creating HD sketches..."
+    if (!file) {
+
+      setStatus(
+        "Please upload a photo first.",
+        true
+      );
+
+      return;
+    }
+
+    try {
+
+      generateBtn.disabled =
+        true;
+
+      payBtn.disabled =
+        true;
+
+      resultsCard.style.display =
+        "none";
+
+      paymentCard.style.display =
+        "none";
+
+      hdCard.style.display =
+        "none";
+
+      results.innerHTML =
+        "";
+
+      hdResults.innerHTML =
+        "";
+
+      setStatus(
+        "⚡ Creating 4 AI sketches..."
+      );
+
+
+      resizedPhoto =
+        await resizePhoto(file);
+
+
+      sessionId =
+        crypto.randomUUID();
+
+
+      /*
+        Send all 4 generation requests
+        at the same time.
+      */
+      const requests =
+        [0, 1, 2, 3].map(
+          styleIndex =>
+            generateOne(
+              styleIndex
+            )
+        );
+
+
+      const images =
+        await Promise.all(
+          requests
+        );
+
+
+      photoHash =
+        images[0].photoHash;
+
+
+      results.innerHTML =
+        "";
+
+
+      images
+        .sort(
+          (a, b) =>
+            a.style -
+            b.style
+        )
+        .forEach(item => {
+
+          const box =
+            document.createElement(
+              "div"
+            );
+
+          box.className =
+            "result";
+
+          const image =
+            document.createElement(
+              "img"
+            );
+
+          image.src =
+            item.image;
+
+          image.alt =
+            item.name;
+
+          image.draggable =
+            false;
+
+          const title =
+            document.createElement(
+              "h3"
+            );
+
+          title.textContent =
+            item.name;
+
+          const locked =
+            document.createElement(
+              "div"
+            );
+
+          locked.className =
+            "locked";
+
+          locked.textContent =
+            "🔒 HD download locked";
+
+          box.appendChild(
+            image
+          );
+
+          box.appendChild(
+            title
+          );
+
+          box.appendChild(
+            locked
+          );
+
+          results.appendChild(
+            box
+          );
+
+        });
+
+
+      resultsCard.style.display =
+        "block";
+
+      paymentCard.style.display =
+        "block";
+
+      payBtn.disabled =
+        false;
+
+      setStatus(
+        "✅ 4 sketches created. Pay ₹99 to unlock HD downloads."
+      );
+
+
+    } catch (error) {
+
+      console.error(error);
+
+      setStatus(
+        error?.message ||
+        "Sketch generation failed.",
+        true
+      );
+
+    } finally {
+
+      generateBtn.disabled =
+        false;
+
+    }
+
+  }
+);
+
+
+/*
+  One preview request.
+*/
+async function generateOne(
+  styleIndex
+) {
+
+  const form =
+    new FormData();
+
+  form.append(
+    "photo",
+    resizedPhoto,
+    "photo.jpg"
+  );
+
+  form.append(
+    "style",
+    String(styleIndex)
+  );
+
+  form.append(
+    "sessionId",
+    sessionId
+  );
+
+
+  const response =
+    await fetch(
+      API_URL +
+      "/api/generate-one",
+      {
+        method: "POST",
+        body: form
+      }
     );
 
 
-    const form =
-      new FormData();
+  const data =
+    await response.json();
 
 
-    form.append(
-      "sessionId",
-      sessionId
+  if (
+    !response.ok ||
+    !data.success
+  ) {
+
+    throw new Error(
+      data.error ||
+      "AI generation failed."
     );
 
-    form.append(
-      "photoHash",
-      photoHash
-    );
-
-    form.append(
-      "razorpay_order_id",
-      payment.razorpay_order_id
-    );
-
-    form.append(
-      "razorpay_payment_id",
-      payment.razorpay_payment_id
-    );
-
-    form.append(
-      "razorpay_signature",
-      payment.razorpay_signature
-    );
-
-    form.append(
-      "photo",
-      resizedPhoto,
-      "photo.jpg"
-    );
+  }
 
 
-    const response =
-      await fetch(
-        API_URL + "/api/verify-payment",
-        {
-          method: "POST",
-          body: form
+  return {
+    style:
+      styleIndex,
+
+    name:
+      data.name,
+
+    image:
+      data.image,
+
+    photoHash:
+      data.photoHash
+  };
+
+}
+
+
+/*
+  Pay ₹99.
+*/
+payBtn.addEventListener(
+  "click",
+  async () => {
+
+    if (
+      !sessionId ||
+      !photoHash ||
+      !resizedPhoto
+    ) {
+
+      setStatus(
+        "Please generate the sketches again.",
+        true
+      );
+
+      return;
+    }
+
+
+    try {
+
+      payBtn.disabled =
+        true;
+
+      setStatus(
+        "Opening secure payment..."
+      );
+
+
+      const response =
+        await fetch(
+          API_URL +
+          "/api/create-order",
+          {
+            method: "POST",
+
+            headers: {
+              "Content-Type":
+                "application/json"
+            },
+
+            body:
+              JSON.stringify({
+                sessionId,
+                photoHash
+              })
+          }
+        );
+
+
+      const data =
+        await response.json();
+
+
+      if (
+        !response.ok ||
+        !data.success
+      ) {
+
+        throw new Error(
+          data.error ||
+          "Could not create payment order."
+        );
+
+      }
+
+
+      if (
+        typeof Razorpay ===
+        "undefined"
+      ) {
+
+        throw new Error(
+          "Razorpay could not load. Please refresh and try again."
+        );
+
+      }
+
+
+      const options = {
+
+        key:
+          data.keyId,
+
+        amount:
+          data.amount,
+
+        currency:
+          data.currency,
+
+        name:
+          "Sketch Art AI",
+
+        description:
+          "Unlock 4 HD AI Sketches",
+
+        order_id:
+          data.orderId,
+
+
+        handler:
+          async payment => {
+
+            await unlockHD(
+              payment
+            );
+
+          },
+
+
+        modal: {
+
+          ondismiss:
+            () => {
+
+              payBtn.disabled =
+                false;
+
+              setStatus(
+                "Payment window closed."
+              );
+
+            }
+
+        },
+
+
+        theme: {
+          color: "#000000"
+        }
+
+      };
+
+
+      const checkout =
+        new Razorpay(
+          options
+        );
+
+
+      checkout.on(
+        "payment.failed",
+        response => {
+
+          console.error(
+            response.error
+          );
+
+          payBtn.disabled =
+            false;
+
+          setStatus(
+            response.error
+              ?.description ||
+            "Payment failed. Please try again.",
+            true
+          );
+
         }
       );
 
 
-    const data =
-      await response.json();
+      checkout.open();
 
 
-    if (
-      !response.ok ||
-      !data.success
-    ) {
+    } catch (error) {
 
-      throw new Error(
-        data.error ||
-        "Payment verification failed."
+      console.error(error);
+
+      payBtn.disabled =
+        false;
+
+      setStatus(
+        error?.message ||
+        "Payment could not start.",
+        true
       );
 
     }
 
-
-    hdResults.innerHTML = "";
-
-
-    data.images.forEach(item => {
-
-      const box =
-        document.createElement("div");
-
-      box.className = "result";
+  }
+);
 
 
-      const image =
-        document.createElement("img");
+/*
+  Payment verification + 4 HD
+  requests in PARALLEL.
+*/
+async function unlockHD(
+  payment
+) {
 
-      image.src =
-        item.image;
+  try {
 
-      image.alt =
-        item.name;
-
-      image.draggable = false;
-
-
-      const title =
-        document.createElement("h3");
-
-      title.textContent =
-        item.name;
+    setStatus(
+      "✅ Payment received. Creating 4 HD sketches..."
+    );
 
 
-      const button =
-        document.createElement("button");
-
-      button.className =
-        "download";
-
-      button.textContent =
-        "⬇️ Download HD";
-
-
-      button.addEventListener(
-        "click",
-        () => {
-
-          const link =
-            document.createElement("a");
-
-          link.href =
-            item.image;
-
-          link.download =
-            "sketch-art-ai-" +
-            item.name
-              .toLowerCase()
-              .replace(/[^a-z0-9]+/g, "-") +
-            ".png";
-
-          document.body.appendChild(link);
-
-          link.click();
-
-          link.remove();
-
-        }
+    const requests =
+      [0, 1, 2, 3].map(
+        styleIndex =>
+          generateHD(
+            styleIndex,
+            payment
+          )
       );
 
 
-      box.appendChild(image);
-      box.appendChild(title);
-      box.appendChild(button);
+    const images =
+      await Promise.all(
+        requests
+      );
 
-      hdResults.appendChild(box);
 
-    });
+    hdResults.innerHTML =
+      "";
+
+
+    images
+      .sort(
+        (a, b) =>
+          a.style -
+          b.style
+      )
+      .forEach(item => {
+
+        const box =
+          document.createElement(
+            "div"
+          );
+
+        box.className =
+          "result";
+
+
+        const image =
+          document.createElement(
+            "img"
+          );
+
+        image.src =
+          item.image;
+
+        image.alt =
+          item.name;
+
+        image.draggable =
+          false;
+
+
+        const title =
+          document.createElement(
+            "h3"
+          );
+
+        title.textContent =
+          item.name;
+
+
+        const download =
+          document.createElement(
+            "button"
+          );
+
+        download.className =
+          "download";
+
+        download.textContent =
+          "⬇️ Download HD";
+
+
+        download.onclick =
+          () => {
+
+            const link =
+              document.createElement(
+                "a"
+              );
+
+            link.href =
+              item.image;
+
+            link.download =
+              "sketch-art-ai-" +
+              item.name
+                .toLowerCase()
+                .replace(
+                  /[^a-z0-9]+/g,
+                  "-"
+                ) +
+              ".png";
+
+            document.body.appendChild(
+              link
+            );
+
+            link.click();
+
+            link.remove();
+
+          };
+
+
+        box.appendChild(
+          image
+        );
+
+        box.appendChild(
+          title
+        );
+
+        box.appendChild(
+          download
+        );
+
+        hdResults.appendChild(
+          box
+        );
+
+      });
 
 
     hdCard.style.display =
@@ -884,7 +1080,7 @@ async function verifyPayment(payment) {
 
 
     setStatus(
-      "✅ Payment verified! Your 4 HD sketches are ready."
+      "🎉 Your 4 HD sketches are ready!"
     );
 
 
@@ -897,11 +1093,12 @@ async function verifyPayment(payment) {
 
     console.error(error);
 
-    payBtn.disabled = false;
+    payBtn.disabled =
+      false;
 
     setStatus(
-      error.message ||
-      "Payment verification failed.",
+      error?.message ||
+      "HD generation failed.",
       true
     );
 
@@ -910,13 +1107,104 @@ async function verifyPayment(payment) {
 }
 
 
-/* Prevent accidental image dragging */
+/*
+  One HD request.
+*/
+async function generateHD(
+  styleIndex,
+  payment
+) {
+
+  const form =
+    new FormData();
+
+  form.append(
+    "photo",
+    resizedPhoto,
+    "photo.jpg"
+  );
+
+  form.append(
+    "style",
+    String(styleIndex)
+  );
+
+  form.append(
+    "sessionId",
+    sessionId
+  );
+
+  form.append(
+    "photoHash",
+    photoHash
+  );
+
+  form.append(
+    "razorpay_order_id",
+    payment.razorpay_order_id
+  );
+
+  form.append(
+    "razorpay_payment_id",
+    payment.razorpay_payment_id
+  );
+
+  form.append(
+    "razorpay_signature",
+    payment.razorpay_signature
+  );
+
+
+  const response =
+    await fetch(
+      API_URL +
+      "/api/verify-payment-one",
+      {
+        method: "POST",
+        body: form
+      }
+    );
+
+
+  const data =
+    await response.json();
+
+
+  if (
+    !response.ok ||
+    !data.success
+  ) {
+
+    throw new Error(
+      data.error ||
+      "Payment verification failed."
+    );
+
+  }
+
+
+  return {
+    style:
+      styleIndex,
+
+    name:
+      data.name,
+
+    image:
+      data.image
+  };
+
+}
+
+
+/* Prevent image dragging */
 document.addEventListener(
   "dragstart",
   event => {
 
     if (
-      event.target.tagName === "IMG"
+      event.target.tagName ===
+      "IMG"
     ) {
       event.preventDefault();
     }
