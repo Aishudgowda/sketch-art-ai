@@ -17,117 +17,110 @@ body{
 }
 header{
   background:#111;
-  color:#fff;
+  color:white;
   text-align:center;
   padding:24px 15px
 }
-header h1{
-  margin:0 0 8px;
-  font-size:30px
-}
-header p{
-  margin:0;
-  color:#ccc
-}
+header h1{margin:0 0 8px}
+header p{margin:0;color:#ccc}
 .container{
   max-width:900px;
-  margin:auto;
-  padding:20px
+  margin:28px auto;
+  padding:0 16px
 }
 .card{
-  background:#fff;
-  border-radius:16px;
-  padding:20px;
+  background:white;
+  border-radius:18px;
+  padding:24px;
   margin-bottom:20px;
-  box-shadow:0 4px 18px rgba(0,0,0,.08)
-}
-h2{
-  margin-top:0
+  box-shadow:0 4px 20px rgba(0,0,0,.08)
 }
 .upload{
-  border:2px dashed #999;
-  padding:25px;
   text-align:center;
-  border-radius:14px
+  border:2px dashed #aaa;
+  border-radius:15px;
+  padding:22px
 }
-input[type=file]{
+.upload input{
   width:100%;
   padding:12px
 }
-#preview{
+.preview{
   display:none;
   width:100%;
-  max-width:300px;
-  max-height:300px;
+  max-width:280px;
+  max-height:280px;
   object-fit:contain;
-  margin:20px auto 0;
+  margin:18px auto;
   border-radius:12px
 }
-button{
+.btn{
   width:100%;
   padding:15px;
   border:0;
-  border-radius:10px;
+  border-radius:12px;
   background:#111;
-  color:#fff;
+  color:white;
   font-size:17px;
-  font-weight:bold;
+  font-weight:700;
   cursor:pointer;
   margin-top:15px
 }
-button:disabled{
+.btn:disabled{
   opacity:.5;
   cursor:not-allowed
 }
 .status{
   text-align:center;
-  margin:15px 0;
-  font-weight:bold
+  margin:18px 0;
+  font-weight:700;
+  min-height:24px
 }
 .grid{
   display:grid;
   grid-template-columns:repeat(2,1fr);
-  gap:15px
+  gap:16px
 }
 .result{
-  background:#fff;
-  border-radius:12px;
-  padding:10px;
-  box-shadow:0 3px 12px rgba(0,0,0,.08)
+  background:#f7f7f7;
+  border-radius:14px;
+  padding:10px
 }
 .result img{
   width:100%;
   display:block;
-  border-radius:8px
+  border-radius:10px
 }
+.result h3{
+  text-align:center;
+  font-size:15px
+}
+.price{
+  text-align:center;
+  font-size:30px;
+  font-weight:800
+}
+.small{
+  text-align:center;
+  color:#666;
+  font-size:14px
+}
+.hidden{display:none}
 .download{
   display:block;
   text-align:center;
-  background:#111;
-  color:#fff;
-  text-decoration:none;
-  padding:11px;
-  border-radius:8px;
-  margin-top:8px
-}
-.price{
-  font-size:34px;
-  font-weight:bold;
-  text-align:center;
-  margin:15px 0
-}
-#paymentCard{
-  display:none
+  margin-top:10px;
+  font-weight:700;
+  color:#111
 }
 footer{
   text-align:center;
-  padding:25px;
-  color:#777
+  padding:30px;
+  color:#777;
+  font-size:13px
 }
 @media(max-width:600px){
-  .grid{
-    grid-template-columns:1fr
-  }
+  .grid{grid-template-columns:1fr}
 }
 </style>
 </head>
@@ -142,86 +135,73 @@ footer{
 <div class="container">
 
   <div class="card">
-
-    <h2>📸 Upload Your Photo</h2>
-
     <div class="upload">
+      <h2>Upload your photo</h2>
+      <p>Choose one clear face photo</p>
 
       <input
-        type="file"
         id="photoInput"
+        type="file"
         accept="image/*"
       >
 
       <img
         id="preview"
+        class="preview"
         alt="Photo preview"
       >
-
     </div>
 
-    <button id="generateBtn">
-      ✨ Generate 4 Sketches
+    <button
+      id="generateBtn"
+      class="btn"
+      disabled
+    >
+      ✨ Generate Sketch
     </button>
 
-    <div
-      id="status"
-      class="status"
-    ></div>
-
+    <div id="status" class="status"></div>
   </div>
 
 
-  <div
-    id="resultsCard"
-    class="card"
-    style="display:none"
-  >
+  <div id="previewCard" class="card hidden">
+    <h2>🎨 Your AI Sketch</h2>
 
-    <h2>🎨 Your Sketches</h2>
+    <p class="small">
+      Preview is free. Pay ₹99 to unlock HD download.
+    </p>
 
-    <div
-      id="results"
-      class="grid"
-    ></div>
-
+    <div id="previewResults" class="grid"></div>
   </div>
 
 
-  <div
-    id="paymentCard"
-    class="card"
-  >
+  <div id="paymentCard" class="card hidden">
 
-    <h2>🔓 Unlock HD Downloads</h2>
-
-    <p>Your 4 previews are ready.</p>
+    <h2>🔓 Unlock HD Download</h2>
 
     <div class="price">₹99</div>
 
-    <p>
-      Pay ₹99 to unlock and download all 4 HD sketches.
+    <p class="small">
+      Pay ₹99 to generate and download your HD sketch.
     </p>
 
-    <button id="payBtn">
+    <button
+      id="payBtn"
+      type="button"
+      class="btn"
+      onclick="startPayment()"
+    >
       💳 Pay ₹99 & Unlock HD
     </button>
 
   </div>
 
 
-  <div
-    id="hdCard"
-    class="card"
-    style="display:none"
-  >
+  <div id="hdCard" class="card hidden">
 
-    <h2>⬇️ Your HD Sketches</h2>
+    <h2>✅ HD Sketch Ready</h2>
 
-    <div
-      id="hdResults"
-      class="grid"
-    ></div>
+    <div id="hdResults" class="grid"></div>
 
   </div>
 
@@ -235,619 +215,416 @@ footer{
 <script>
 
 const API_URL =
-  "https://sketch-art-ai-api.aishudgowda2004.workers.dev";
+"https://sketch-art-ai-api.aishudgowda2004.workers.dev";
 
 
+const photoInput =
+document.getElementById("photoInput");
+
+const preview =
+document.getElementById("preview");
+
+const generateBtn =
+document.getElementById("generateBtn");
+
+const payBtn =
+document.getElementById("payBtn");
+
+const statusBox =
+document.getElementById("status");
+
+const previewCard =
+document.getElementById("previewCard");
+
+const previewResults =
+document.getElementById("previewResults");
+
+const paymentCard =
+document.getElementById("paymentCard");
+
+const hdCard =
+document.getElementById("hdCard");
+
+const hdResults =
+document.getElementById("hdResults");
+
+
+let selectedFile = null;
 let resizedPhoto = null;
 let sessionId = null;
 let photoHash = null;
 
 
-const photoInput =
-  document.getElementById("photoInput");
+function setStatus(text,error=false){
 
-const preview =
-  document.getElementById("preview");
+  statusBox.textContent = text;
 
-const generateBtn =
-  document.getElementById("generateBtn");
-
-const payBtn =
-  document.getElementById("payBtn");
-
-const status =
-  document.getElementById("status");
-
-const resultsCard =
-  document.getElementById("resultsCard");
-
-const results =
-  document.getElementById("results");
-
-const paymentCard =
-  document.getElementById("paymentCard");
-
-const hdCard =
-  document.getElementById("hdCard");
-
-const hdResults =
-  document.getElementById("hdResults");
-
-
-function setStatus(message){
-  status.textContent = message;
-}
-
-
-function makeSessionId(){
-
-  if(window.crypto && crypto.randomUUID){
-    return crypto.randomUUID();
-  }
-
-  return (
-    Date.now().toString(36) +
-    Math.random().toString(36).slice(2)
-  );
-
-}
-
-
-async function hashFile(file){
-
-  const buffer =
-    await file.arrayBuffer();
-
-  const hash =
-    await crypto.subtle.digest(
-      "SHA-256",
-      buffer
-    );
-
-  return Array.from(
-    new Uint8Array(hash)
-  )
-  .map(
-    b => b.toString(16).padStart(2,"0")
-  )
-  .join("");
-
+  statusBox.style.color =
+    error ? "#b00020" : "#111";
 }
 
 
 async function resizePhoto(file){
 
-  return new Promise((resolve,reject)=>{
+  const img = new Image();
 
-    const reader =
-      new FileReader();
+  const url =
+    URL.createObjectURL(file);
 
-    reader.onload = () => {
+  try{
 
-      const img =
-        new Image();
+    await new Promise((resolve,reject)=>{
 
-      img.onload = () => {
+      img.onload = resolve;
 
-        const maxSize = 480;
-
-        let width =
-          img.width;
-
-        let height =
-          img.height;
-
-        const scale =
-          Math.min(
-            1,
-            maxSize /
-            Math.max(width,height)
-          );
-
-        width =
-          Math.round(width * scale);
-
-        height =
-          Math.round(height * scale);
-
-        const canvas =
-          document.createElement("canvas");
-
-        canvas.width =
-          width;
-
-        canvas.height =
-          height;
-
-        const ctx =
-          canvas.getContext("2d");
-
-        ctx.drawImage(
-          img,
-          0,
-          0,
-          width,
-          height
+      img.onerror = () =>
+        reject(
+          new Error("Could not read photo.")
         );
 
-        canvas.toBlob(
-          blob => {
+      img.src = url;
 
-            if(!blob){
-              reject(
+    });
+
+    const maxSize = 480;
+
+    const scale =
+      Math.min(
+        1,
+        maxSize /
+        Math.max(
+          img.naturalWidth,
+          img.naturalHeight
+        )
+      );
+
+    const width =
+      Math.max(
+        1,
+        Math.round(img.naturalWidth * scale)
+      );
+
+    const height =
+      Math.max(
+        1,
+        Math.round(img.naturalHeight * scale)
+      );
+
+    const canvas =
+      document.createElement("canvas");
+
+    canvas.width = width;
+    canvas.height = height;
+
+    const ctx =
+      canvas.getContext("2d");
+
+    ctx.drawImage(
+      img,
+      0,
+      0,
+      width,
+      height
+    );
+
+    const blob =
+      await new Promise((resolve,reject)=>{
+
+        canvas.toBlob(
+          b => b
+            ? resolve(b)
+            : reject(
                 new Error(
                   "Could not resize photo."
                 )
-              );
-              return;
-            }
-
-            resolve(
-              new File(
-                [blob],
-                "photo.jpg",
-                {
-                  type:"image/jpeg"
-                }
-              )
-            );
-
-          },
+              ),
           "image/jpeg",
           0.85
         );
 
-      };
+      });
 
-      img.onerror = () =>
-        reject(
-          new Error(
-            "Could not read image."
-          )
-        );
+    return new File(
+      [blob],
+      "reference.jpg",
+      {type:"image/jpeg"}
+    );
 
-      img.src =
-        reader.result;
+  }finally{
 
-    };
+    URL.revokeObjectURL(url);
 
-    reader.onerror = () =>
-      reject(
-        new Error(
-          "Could not read photo."
-        )
-      );
+  }
+}
 
-    reader.readAsDataURL(file);
 
-  });
+function renderImages(
+  container,
+  images,
+  downloadable
+){
 
+  container.innerHTML = "";
+
+  images.forEach(
+    (item,index)=>{
+
+      const src =
+        item.image || item;
+
+      const box =
+        document.createElement("div");
+
+      box.className = "result";
+
+      const img =
+        document.createElement("img");
+
+      img.src = src;
+
+      img.alt =
+        "Sketch " + (index + 1);
+
+      box.appendChild(img);
+
+      if(downloadable){
+
+        const a =
+          document.createElement("a");
+
+        a.href = src;
+
+        a.download =
+          "sketch-art-hd-" +
+          (index + 1) +
+          ".png";
+
+        a.textContent =
+          "⬇️ Download HD";
+
+        a.className = "download";
+
+        box.appendChild(a);
+      }
+
+      container.appendChild(box);
+
+    }
+  );
 }
 
 
 photoInput.addEventListener(
-  "change",
-  async () => {
+"change",
+function(){
 
-    const file =
-      photoInput.files[0];
+  selectedFile =
+    photoInput.files &&
+    photoInput.files[0];
 
-    if(!file){
-      return;
-    }
+  if(!selectedFile){
 
-    if(!file.type.startsWith("image/")){
-      setStatus(
-        "Please select an image."
-      );
-      return;
-    }
+    generateBtn.disabled = true;
 
-    try{
+    preview.style.display = "none";
 
-      preview.src =
-        URL.createObjectURL(file);
-
-      preview.style.display =
-        "block";
-
-      setStatus(
-        "Preparing your photo..."
-      );
-
-      resizedPhoto =
-        await resizePhoto(file);
-
-      photoHash =
-        await hashFile(resizedPhoto);
-
-      sessionId =
-        makeSessionId();
-
-      setStatus(
-        "Photo ready. Tap Generate."
-      );
-
-    }catch(error){
-
-      console.error(error);
-
-      setStatus(
-        error.message ||
-        "Could not prepare photo."
-      );
-
-    }
-
+    return;
   }
-);
+
+  if(
+    !selectedFile.type.startsWith("image/")
+  ){
+
+    setStatus(
+      "Please choose an image.",
+      true
+    );
+
+    return;
+  }
+
+  preview.src =
+    URL.createObjectURL(
+      selectedFile
+    );
+
+  preview.style.display =
+    "block";
+
+  generateBtn.disabled =
+    false;
+
+  setStatus("");
+
+  previewCard.classList.add("hidden");
+  paymentCard.classList.add("hidden");
+  hdCard.classList.add("hidden");
+
+  sessionId = null;
+  photoHash = null;
+  resizedPhoto = null;
+
+});
 
 
 generateBtn.addEventListener(
-  "click",
-  async () => {
+"click",
+async function(){
 
-    if(!resizedPhoto){
+  if(!selectedFile) return;
 
-      setStatus(
-        "Please upload a photo first."
-      );
+  generateBtn.disabled = true;
 
-      return;
-    }
-
-    try{
-
-      generateBtn.disabled =
-        true;
-
-      paymentCard.style.display =
-        "none";
-
-      hdCard.style.display =
-        "none";
-
-      resultsCard.style.display =
-        "block";
-
-      results.innerHTML =
-        "";
-
-      setStatus(
-        "Creating 4 AI sketches..."
-      );
-
-
-      const form =
-        new FormData();
-
-      form.append(
-        "photo",
-        resizedPhoto,
-        "photo.jpg"
-      );
-
-      form.append(
-        "sessionId",
-        sessionId
-      );
-
-
-      const response =
-        await fetch(
-          API_URL +
-          "/api/generate",
-          {
-            method:"POST",
-            body:form
-          }
-        );
-
-
-      let data;
-
-      try{
-        data =
-          await response.json();
-      }catch{
-        throw new Error(
-          "Server returned an invalid response."
-        );
-      }
-
-
-      if(
-        !response.ok ||
-        !data.success
-      ){
-
-        throw new Error(
-          data.error ||
-          "Image generation failed."
-        );
-
-      }
-
-
-      if(
-        !Array.isArray(data.images) ||
-        data.images.length === 0
-      ){
-
-        throw new Error(
-          "No images were returned."
-        );
-
-      }
-
-
-      data.images.forEach(
-        (image,index)=>{
-
-          const box =
-            document.createElement("div");
-
-          box.className =
-            "result";
-
-          const img =
-            document.createElement("img");
-
-          img.src =
-            image;
-
-          img.alt =
-            "AI Sketch " +
-            (index + 1);
-
-          box.appendChild(img);
-
-          results.appendChild(box);
-
-        }
-      );
-
-
-      paymentCard.style.display =
-        "block";
-
-      setStatus(
-        "✅ 4 previews are ready. Unlock HD for ₹99."
-      );
-
-
-    }catch(error){
-
-      console.error(error);
-
-      setStatus(
-        "❌ " +
-        (
-          error.message ||
-          "Something went wrong."
-        )
-      );
-
-    }finally{
-
-      generateBtn.disabled =
-        false;
-
-    }
-
-  }
-);
-
-
-payBtn.addEventListener(
-  "click",
-  async () => {
-
-    try{
-
-      payBtn.disabled =
-        true;
-
-      setStatus(
-        "Opening secure payment..."
-      );
-
-
-      const response =
-        await fetch(
-          API_URL +
-          "/api/create-order",
-          {
-            method:"POST",
-            headers:{
-              "Content-Type":
-                "application/json"
-            },
-            body:JSON.stringify({
-              sessionId,
-              photoHash
-            })
-          }
-        );
-
-
-      let data;
-
-      try{
-        data =
-          await response.json();
-      }catch{
-        throw new Error(
-          "Invalid payment response."
-        );
-      }
-
-
-      if(
-        !response.ok ||
-        !data.success
-      ){
-
-        throw new Error(
-          data.error ||
-          "Could not create payment order."
-        );
-
-      }
-
-
-      if(
-        typeof Razorpay ===
-        "undefined"
-      ){
-
-        throw new Error(
-          "Razorpay could not load. Please refresh."
-        );
-
-      }
-
-
-      const options = {
-
-        key:
-          data.keyId,
-
-        amount:
-          data.amount,
-
-        currency:
-          data.currency,
-
-        name:
-          "Sketch Art AI",
-
-        description:
-          "Unlock 4 HD AI Sketches",
-
-        order_id:
-          data.orderId,
-
-        handler:
-          async function(payment){
-
-            await verifyPayment(
-              payment
-            );
-
-          },
-
-        modal:{
-          ondismiss:
-            function(){
-
-              payBtn.disabled =
-                false;
-
-              setStatus(
-                "Payment cancelled."
-              );
-
-            }
-        }
-
-      };
-
-
-      const razorpay =
-        new Razorpay(options);
-
-      razorpay.open();
-
-
-    }catch(error){
-
-      console.error(error);
-
-      payBtn.disabled =
-        false;
-
-      setStatus(
-        "❌ " +
-        (
-          error.message ||
-          "Payment failed."
-        )
-      );
-
-    }
-
-  }
-);
-
-
-async function verifyPayment(
-  payment
-){
+  setStatus(
+    "✨ Creating your AI sketch..."
+  );
 
   try{
 
-    setStatus(
-      "Payment successful. Creating HD sketches..."
-    );
-
+    resizedPhoto =
+      await resizePhoto(
+        selectedFile
+      );
 
     const form =
       new FormData();
 
     form.append(
-      "razorpay_order_id",
-      payment.razorpay_order_id
-    );
-
-    form.append(
-      "razorpay_payment_id",
-      payment.razorpay_payment_id
-    );
-
-    form.append(
-      "razorpay_signature",
-      payment.razorpay_signature
-    );
-
-    form.append(
-      "sessionId",
-      sessionId
-    );
-
-    form.append(
-      "photoHash",
-      photoHash
-    );
-
-    form.append(
       "photo",
       resizedPhoto,
-      "photo.jpg"
+      "reference.jpg"
     );
-
 
     const response =
       await fetch(
-        API_URL +
-        "/api/verify-payment",
+        API_URL + "/api/generate",
         {
           method:"POST",
           body:form
         }
       );
 
+    const data =
+      await response
+      .json()
+      .catch(()=>({}));
 
-    let data;
+    if(
+      !response.ok ||
+      !data.success
+    ){
 
-    try{
-      data =
-        await response.json();
-    }catch{
       throw new Error(
-        "Invalid server response."
+        data.error ||
+        "Image generation failed."
       );
+
     }
+
+    sessionId =
+      data.sessionId;
+
+    photoHash =
+      data.photoHash;
+
+    renderImages(
+      previewResults,
+      data.images || [],
+      false
+    );
+
+    previewCard.classList.remove(
+      "hidden"
+    );
+
+    paymentCard.classList.remove(
+      "hidden"
+    );
+
+    setStatus(
+      "✅ Preview ready. Unlock HD for ₹99."
+    );
+
+    paymentCard.scrollIntoView({
+      behavior:"smooth",
+      block:"center"
+    });
+
+  }catch(error){
+
+    console.error(error);
+
+    setStatus(
+      "❌ " +
+      (
+        error.message ||
+        "Generation failed."
+      ),
+      true
+    );
+
+  }finally{
+
+    generateBtn.disabled = false;
+
+  }
+
+});
+
+
+async function startPayment(){
+
+  if(
+    !sessionId ||
+    !photoHash ||
+    !resizedPhoto
+  ){
+
+    setStatus(
+      "Please generate the sketch first.",
+      true
+    );
+
+    return;
+  }
+
+  payBtn.disabled = true;
+
+  setStatus(
+    "Opening secure payment..."
+  );
+
+  try{
+
+    const response =
+      await fetch(
+        API_URL +
+        "/api/create-order",
+        {
+          method:"POST",
+
+          headers:{
+            "Content-Type":
+              "application/json"
+          },
+
+          body:JSON.stringify({
+
+            sessionId:
+              sessionId,
+
+            photoHash:
+              photoHash
+
+          })
+        }
+      );
+
+
+    const data =
+      await response
+      .json()
+      .catch(()=>({}));
 
 
     if(
@@ -857,109 +634,212 @@ async function verifyPayment(
 
       throw new Error(
         data.error ||
-        "Payment verification failed."
+        "Could not create payment order."
       );
 
     }
 
 
     if(
-      !Array.isArray(data.images)
+      typeof window.Razorpay !==
+      "function"
     ){
 
       throw new Error(
-        "HD images were not returned."
+        "Razorpay failed to load. Please refresh."
       );
 
     }
 
 
-    hdResults.innerHTML =
-      "";
+    const options = {
 
-    data.images.forEach(
-      (image,index)=>{
+      key:
+        data.keyId,
 
-        const box =
-          document.createElement("div");
+      amount:
+        data.amount,
 
-        box.className =
-          "result";
+      currency:
+        data.currency,
 
+      name:
+        "Sketch Art AI",
 
-        const img =
-          document.createElement("img");
+      description:
+        "Unlock HD AI Sketch",
 
-        img.src =
-          image;
-
-        img.alt =
-          "HD Sketch " +
-          (index + 1);
+      order_id:
+        data.orderId,
 
 
-        const download =
-          document.createElement("a");
+      handler:
+      async function(result){
 
-        download.className =
-          "download";
+        try{
 
-        download.textContent =
-          "⬇️ Download HD";
-
-        download.href =
-          image;
-
-        download.download =
-          "sketch-art-" +
-          (index + 1) +
-          ".png";
+          setStatus(
+            "✅ Payment received. Verifying..."
+          );
 
 
-        box.appendChild(img);
+          const form =
+            new FormData();
 
-        box.appendChild(
-          download
-        );
 
-        hdResults.appendChild(
-          box
-        );
+          form.append(
+            "sessionId",
+            sessionId
+          );
 
+          form.append(
+            "photoHash",
+            photoHash
+          );
+
+          form.append(
+            "razorpay_order_id",
+            result.razorpay_order_id
+          );
+
+          form.append(
+            "razorpay_payment_id",
+            result.razorpay_payment_id
+          );
+
+          form.append(
+            "razorpay_signature",
+            result.razorpay_signature
+          );
+
+          form.append(
+            "photo",
+            resizedPhoto,
+            "reference.jpg"
+          );
+
+
+          const verify =
+            await fetch(
+              API_URL +
+              "/api/verify-payment",
+              {
+                method:"POST",
+                body:form
+              }
+            );
+
+
+          const verifyData =
+            await verify
+            .json()
+            .catch(()=>({}));
+
+
+          if(
+            !verify.ok ||
+            !verifyData.success
+          ){
+
+            throw new Error(
+              verifyData.error ||
+              "Payment verification failed."
+            );
+
+          }
+
+
+          renderImages(
+            hdResults,
+            verifyData.images || [],
+            true
+          );
+
+
+          paymentCard.classList.add(
+            "hidden"
+          );
+
+          hdCard.classList.remove(
+            "hidden"
+          );
+
+
+          setStatus(
+            "🎉 Payment successful! HD sketch ready."
+          );
+
+
+          hdCard.scrollIntoView({
+            behavior:"smooth",
+            block:"start"
+          });
+
+
+        }catch(error){
+
+          console.error(error);
+
+          setStatus(
+            "❌ " +
+            (
+              error.message ||
+              "Payment verification failed."
+            ),
+            true
+          );
+
+          payBtn.disabled = false;
+
+        }
+
+      },
+
+
+      modal:{
+
+        ondismiss:function(){
+
+          payBtn.disabled = false;
+
+          setStatus(
+            "Payment cancelled. Try again."
+          );
+
+        }
+
+      },
+
+
+      theme:{
+        color:"#111111"
       }
-    );
+
+    };
 
 
-    hdCard.style.display =
-      "block";
+    const razorpay =
+      new window.Razorpay(
+        options
+      );
 
-    paymentCard.style.display =
-      "none";
-
-    setStatus(
-      "✅ Done! Your 4 HD sketches are ready."
-    );
-
-
-    hdCard.scrollIntoView({
-      behavior:"smooth"
-    });
+    razorpay.open();
 
 
   }catch(error){
 
     console.error(error);
 
-    payBtn.disabled =
-      false;
-
     setStatus(
       "❌ " +
       (
         error.message ||
-        "HD generation failed."
-      )
+        "Payment could not start."
+      ),
+      true
     );
+
+    payBtn.disabled = false;
 
   }
 
