@@ -428,3 +428,280 @@ async function verifyPayment(
     String(payment.status) !==
     "captured"
   )
+{
+  throw new Error(
+    "Payment is not captured"
+  );
+}
+
+const cleanSession =
+  String(sessionId)
+    .replace(/[^a-zA-Z0-9]/g, "")
+    .slice(0, 32);
+
+const orderNotes =
+  order.notes || {};
+
+if (
+  orderNotes.session_id &&
+  String(orderNotes.session_id) !==
+    cleanSession
+) {
+  throw new Error(
+    "Session verification failed"
+  );
+}
+
+const photoBytes =
+  new Uint8Array(
+    await photo.arrayBuffer()
+  );
+
+const actualPhotoHash =
+  await sha256Bytes(
+    photoBytes
+  );
+
+if (
+  !safeEqual(
+    actualPhotoHash,
+    String(photoHash)
+  )
+) {
+  throw new Error(
+    "Photo does not match the original request"
+  );
+}
+
+if (
+  orderNotes.photo_hash &&
+  String(orderNotes.photo_hash) !==
+    String(photoHash)
+) {
+  throw new Error(
+    "Photo verification failed"
+  );
+}
+
+const styleIndex =
+  Number(style);
+
+if (
+  !Number.isInteger(styleIndex) ||
+  styleIndex < 0 ||
+  styleIndex >= styles.length
+) {
+  throw new Error(
+    "Invalid sketch style"
+  );
+}
+
+const image =
+  await generateSketch(
+    env,
+    photo,
+    styleIndex
+  );
+
+return {
+  success: true,
+  image,
+  name:
+    `${styles[styleIndex].name} HD`
+};
+}
+
+export default {
+  async fetch(request, env) {
+    if (
+      request.method === "OPTIONS"
+    ) {
+      return new Response(null, {
+        status: 204,
+        headers: {
+          "Access-Control-Allow-Origin": "*",
+          "Access-Control-Allow-Methods":
+            "GET,POST,OPTIONS",
+          "Access-Control-Allow-Headers":
+            "Content-Type"
+        }
+      });
+    }
+
+    const url =
+      new URL(request.url);
+
+    try {
+      if (
+        request.method === "GET" &&
+        url.pathname === "/"
+      ) {
+        return json({
+          ok: true,
+          service: "Sketch Art AI",
+          worldwide: true,
+          version: "3.0"
+        });
+      }
+
+      if (
+        request.method === "GET" &&
+        url.pathname === "/api/config"
+      ) {
+        return json({
+          success: true,
+          razorpayKeyId:
+            env.RAZORPAY_KEY_ID || "",
+          price: PRICE,
+          currency: CURRENCY
+        });
+      }
+
+      if (
+        request.method === "POST" &&
+        url.pathname === "/api/generate-one"
+      ) {
+        const formData =
+          await request.formData();
+
+        const photo =
+          formData.get("photo");
+
+        const style =
+          formData.get("style");
+
+        const sessionId =
+          formData.get("sessionId");
+
+        if (!(photo instanceof File)) {
+          return json(
+            {
+              success: false,
+              error: "Photo is required"
+            },
+            400
+          );
+        }
+
+        if (!sessionId) {
+          return json(
+            {
+              success: false,
+              error: "Session is required"
+            },
+            400
+          );
+        }
+
+        const styleIndex =
+          Number(style);
+
+        if (
+          !Number.isInteger(styleIndex) ||
+          styleIndex < 0 ||
+          styleIndex >= styles.length
+        ) {
+          return json(
+            {
+              success: false,
+              error: "Invalid style"
+            },
+            400
+          );
+        }
+
+        const photoBytes =
+          new Uint8Array(
+            await photo.arrayBuffer()
+          );
+
+        const photoHash =
+          await sha256Bytes(
+            photoBytes
+          );
+
+        const image =
+          await generateSketch(
+            env,
+            photo,
+            styleIndex
+          );
+
+        return json({
+          success: true,
+          sessionId,
+          photoHash,
+          style: styleIndex,
+          name:
+            styles[styleIndex].name,
+          image
+        });
+      }
+
+      if (
+        request.method === "POST" &&
+        url.pathname === "/api/create-order"
+      ) {
+        const body =
+          await request.json();
+
+        const order =
+          await createOrder(
+            env,
+            body.sessionId,
+            body.photoHash
+          );
+
+        return json({
+          success: true,
+          keyId:
+            env.RAZORPAY_KEY_ID,
+          orderId: order.id,
+          amount: order.amount,
+          currency: order.currency
+        });
+      }
+
+      if (
+        request.method === "POST" &&
+        url.pathname ===
+          "/api/verify-payment-one"
+      ) {
+        const formData =
+          await request.formData();
+
+        const result =
+          await verifyPayment(
+            env,
+            formData
+          );
+
+        return json(result);
+      }
+
+      return json(
+        {
+          success: false,
+          error: "Endpoint not found"
+        },
+        404
+      );
+
+    } catch (error) {
+      console.error(
+        "Sketch Art AI error:",
+        error
+      );
+
+      return json(
+        {
+          success: false,
+          error:
+            error?.message ||
+            "Something went wrong"
+        },
+        500
+      );
+    }
+  }
+};    
