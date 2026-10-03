@@ -136,11 +136,13 @@ async function ai(env,bytes,prompt,w,h){
 }
 
 async function all(env,b,w,h){
-  return Promise.all(
-    STYLES.map(
-      p=>ai(env,b,p,w,h)
-    )
-  );
+  const results = [];
+
+  for (const p of STYLES) {
+    results.push(await ai(env,b,p,w,h));
+  }
+
+  return results;
 }
 
 export default{
